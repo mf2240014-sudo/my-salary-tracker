@@ -8,6 +8,7 @@
   html,
   body {
     font-family: "Hind Siliguri", "Noto Sans Bengali", sans-serif;
+    font-feature-settings: "kern" 1, "liga" 1;
     background-color: #070b14;
     color: #e2e8f0;
     line-height: 1.5;
@@ -33,6 +34,7 @@
   select,
   textarea {
     font-family: "Hind Siliguri", "Noto Sans Bengali", sans-serif;
+    font-feature-settings: "kern" 1, "liga" 1;
     line-height: 1.5;
   }
 }
@@ -40,7 +42,13 @@
 .font-num {
   font-family: "Hind Siliguri", "Noto Sans Bengali", sans-serif;
   font-variant-numeric: tabular-nums;
-  font-feature-settings: "tnum" 1;
+  font-feature-settings: "kern" 1, "liga" 1, "tnum" 1;
+}
+
+.font-bengali-report {
+  font-family: "Hind Siliguri", "Noto Sans Bengali", sans-serif;
+  font-feature-settings: "kern" 1, "liga" 1;
+  line-height: 1.6;
 }
 
 /* Custom range slider for dark vault UI */

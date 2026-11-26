@@ -1,10 +1,17 @@
 import {MinusCircle} from 'lucide-react';
 import {useEffect, useState} from 'react';
-import {BUCKET_LIST, BucketId, BucketsMap} from '../types/budget';
+import {
+  BUCKET_LIST,
+  BucketId,
+  BucketsMap,
+  getVaultDisplayName,
+  VaultConfigMap,
+} from '../types/budget';
 import {formatBDT, getTodayISODate} from '../utils/format';
 
 interface QuickExpensePanelProps {
   buckets: BucketsMap;
+  vaultConfig: VaultConfigMap;
   selectedBucket: BucketId;
   privacyMasked: boolean;
   onSelectBucket: (bucketId: BucketId) => void;
@@ -19,6 +26,7 @@ interface QuickExpensePanelProps {
 
 export function QuickExpensePanel({
   buckets,
+  vaultConfig,
   selectedBucket,
   privacyMasked,
   onSelectBucket,
@@ -87,7 +95,7 @@ export function QuickExpensePanel({
                 const rem = buckets[b.id].allocated - buckets[b.id].spent;
                 return (
                   <option key={b.id} value={b.id} className="bg-[#0b1120] text-white">
-                    {b.orderLabel} {b.name} ({formatBDT(rem, privacyMasked)})
+                    {getVaultDisplayName(vaultConfig, b.id, true)} ({formatBDT(rem, privacyMasked)})
                   </option>
                 );
               })}

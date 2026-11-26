@@ -1,6 +1,6 @@
 import {ArrowRight, CheckCircle2, Handshake, PlusCircle, Trash2} from 'lucide-react';
 import {useState} from 'react';
-import {LoanRecord, LoanType} from '../types/budget';
+import {LoanRecord, LoanType, VaultConfigMap} from '../types/budget';
 import {formatBDT, formatBengaliDate, formatNumber, getTodayISODate} from '../utils/format';
 
 interface LoansSummaryWidgetProps {
@@ -72,6 +72,7 @@ export function LoansSummaryWidget({
 
 interface LoansViewProps {
   loans: LoanRecord[];
+  vaultConfig: VaultConfigMap;
   privacyMasked: boolean;
   onAddLoan: (payload: {
     type: LoanType;
@@ -86,6 +87,7 @@ interface LoansViewProps {
 
 export function LoansView({
   loans,
+  vaultConfig,
   privacyMasked,
   onAddLoan,
   onSettleLoan,
@@ -439,7 +441,7 @@ export function LoansView({
                 }}
                 className="w-full min-h-[44px] px-4 py-2.5 text-sm font-bold text-[#041210] bg-gradient-to-r from-emerald-400 to-teal-300 hover:from-emerald-300 hover:to-teal-200 rounded-xl transition-all cursor-pointer"
               >
-                ৩. মূল সঞ্চয় ভল্টে যোগ করুন
+                ৩. {vaultConfig.savings.name}-এ যোগ করুন
               </button>
 
               <button
@@ -450,7 +452,7 @@ export function LoansView({
                 }}
                 className="w-full min-h-[44px] px-4 py-2.5 text-sm font-bold text-cyan-200 bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-400/40 rounded-xl transition-colors cursor-pointer"
               >
-                ৪. নিজের হাতখরচ ভল্টে যোগ করুন
+                ৪. {vaultConfig.personal.name}-এ যোগ করুন
               </button>
 
               <button

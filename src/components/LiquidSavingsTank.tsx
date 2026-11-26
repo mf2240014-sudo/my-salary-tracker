@@ -5,6 +5,7 @@ import {formatBDT, formatNumber} from '../utils/format';
 interface LiquidSavingsTankProps {
   savingsGoal: number;
   currentSavings: number;
+  savingsVaultName?: string;
   privacyMasked: boolean;
   onChangeGoal: (nextGoal: number) => void;
 }
@@ -12,6 +13,7 @@ interface LiquidSavingsTankProps {
 export function LiquidSavingsTank({
   savingsGoal,
   currentSavings,
+  savingsVaultName = 'মূল সঞ্চয়',
   privacyMasked,
   onChangeGoal,
 }: LiquidSavingsTankProps) {
@@ -36,7 +38,7 @@ export function LiquidSavingsTank({
             সঞ্চয় লক্ষ্যমাত্রা
           </h2>
           <p className="text-xs font-medium text-slate-300 leading-[1.5]">
-            মূল সঞ্চয় ভল্টের জমানো অর্থের অগ্রগতি
+            {savingsVaultName}-এর জমানো অর্থের অগ্রগতি
           </p>
         </div>
         <div className="w-9 h-9 rounded-xl bg-cyan-500/15 border border-cyan-400/30 text-cyan-300 flex items-center justify-center shrink-0">

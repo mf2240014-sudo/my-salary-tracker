@@ -8,6 +8,14 @@ export interface BucketMeta {
   description: string;
 }
 
+export interface CustomVaultConfig {
+  name: string;
+  shortName: string;
+  quickAmounts: number[];
+}
+
+export type VaultConfigMap = Record<BucketId, CustomVaultConfig>;
+
 export interface BucketState {
   allocated: number;
   spent: number;
@@ -66,8 +74,10 @@ export interface UserProfile {
 }
 
 export interface BudgetAppState {
+  onboardingCompleted: boolean;
   setup: IncomeSetupConfig;
   profile: UserProfile;
+  vaultConfig: VaultConfigMap;
   security: SecuritySettings;
   savingsGoal: number;
   buckets: BucketsMap;
@@ -79,29 +89,29 @@ export const BUCKET_LIST: BucketMeta[] = [
   {
     id: 'home',
     orderLabel: '১.',
-    name: 'বাসায় দেওয়া ভল্ট',
-    shortName: 'বাসা',
+    name: 'বাসায় দেওয়া / ভাড়া',
+    shortName: 'বাসা / ভাড়া',
     description: 'পরিবার ও বাসার মাসিক খরচ',
   },
   {
     id: 'officeFood',
     orderLabel: '২.',
-    name: 'অফিস খাবার ভল্ট',
-    shortName: 'অফিস খাবার',
+    name: 'খাবার / বাজার',
+    shortName: 'খাবার / বাজার',
     description: 'দুপুরের খাবার ও নাস্তা',
   },
   {
     id: 'savings',
     orderLabel: '৩.',
-    name: 'মূল সঞ্চয় ভল্ট',
+    name: 'মূল সঞ্চয়',
     shortName: 'মূল সঞ্চয়',
     description: 'ভবিষ্যতের জরুরি সঞ্চয় তহবিল',
   },
   {
     id: 'personal',
     orderLabel: '৪.',
-    name: 'নিজের হাতখরচ ভল্ট',
-    shortName: 'হাতখরচ',
+    name: 'ব্যক্তিগত খরচ',
+    shortName: 'ব্যক্তিগত খরচ',
     description: 'যাতায়াত ও ব্যক্তিগত খরচ',
   },
 ];
@@ -113,6 +123,29 @@ export const BUCKET_BY_ID: Record<BucketId, BucketMeta> = {
   personal: BUCKET_LIST[3],
 };
 
+export const DEFAULT_VAULT_CONFIG: VaultConfigMap = {
+  home: {
+    name: 'বাসায় দেওয়া / ভাড়া',
+    shortName: 'বাসা',
+    quickAmounts: [],
+  },
+  officeFood: {
+    name: 'অফিস খাবার',
+    shortName: 'খাবার',
+    quickAmounts: [50, 80, 100],
+  },
+  savings: {
+    name: 'মূল সঞ্চয়',
+    shortName: 'মূল সঞ্চয়',
+    quickAmounts: [],
+  },
+  personal: {
+    name: 'নিজের হাতখরচ',
+    shortName: 'হাতখরচ',
+    quickAmounts: [],
+  },
+};
+
 export const HOME_QUICK_AMOUNTS = [8000, 9000, 10000, 11000] as const;
 export const OFFICE_FOOD_QUICK_AMOUNTS = [50, 80, 100] as const;
 export const GOAL_QUICK_AMOUNTS = [15000, 20000, 30000] as const;
@@ -121,8 +154,8 @@ export const DEFAULT_AVATAR_URL =
   '/src/assets/images/avatar_bengali_user_1795716228624.jpg';
 
 export const DEFAULT_PROFILE: UserProfile = {
-  name: 'মোহাম্মদ রাতুল',
-  avatarUrl: DEFAULT_AVATAR_URL,
+  name: 'ব্যবহারকারী',
+  avatarUrl: '',
 };
 
 export const DEFAULT_SECURITY: SecuritySettings = {
@@ -133,12 +166,12 @@ export const DEFAULT_SECURITY: SecuritySettings = {
 };
 
 export const DEFAULT_SETUP: IncomeSetupConfig = {
-  basicSalary: 14000,
-  offDaysCount: 4,
+  basicSalary: 0,
+  offDaysCount: 0,
   offDayRate: 700,
-  overtimeIncome: 2800,
-  homeContribution: 9500,
-  officeFoodBudget: 3000,
+  overtimeIncome: 0,
+  homeContribution: 0,
+  officeFoodBudget: 0,
   savingsPercent: 60,
 };
 
@@ -152,8 +185,10 @@ export const EMPTY_BUCKETS: BucketsMap = {
 };
 
 export const EMPTY_APP_STATE: BudgetAppState = {
+  onboardingCompleted: false,
   setup: DEFAULT_SETUP,
   profile: DEFAULT_PROFILE,
+  vaultConfig: DEFAULT_VAULT_CONFIG,
   security: DEFAULT_SECURITY,
   savingsGoal: DEFAULT_SAVINGS_GOAL,
   buckets: EMPTY_BUCKETS,
@@ -161,35 +196,19 @@ export const EMPTY_APP_STATE: BudgetAppState = {
   loans: [],
 };
 
-export function createInitialSeedState(todayISO: string): BudgetAppState {
-  return {
-    setup: DEFAULT_SETUP,
-    profile: DEFAULT_PROFILE,
-    security: DEFAULT_SECURITY,
-    savingsGoal: DEFAULT_SAVINGS_GOAL,
-    buckets: {
-      home: {allocated: 9500, spent: 0},
-      officeFood: {allocated: 3000, spent: 0},
-      savings: {allocated: 2580, spent: 0},
-      personal: {allocated: 1720, spent: 0},
-    },
-    transactions: [
-      {
-        id: 'seed-salary-current',
-        type: 'salary',
-        date: todayISO,
-        createdAt: new Date().toISOString(),
-        bucketId: 'home',
-        note: 'মাসিক আয় বণ্টন (বেসিক ১৪,০০০ + অফ-ডে ২,৮০০)',
-        amount: 16800,
-        salaryBreakdown: {
-          home: 9500,
-          officeFood: 3000,
-          savings: 2580,
-          personal: 1720,
-        },
-      },
-    ],
-    loans: [],
-  };
+export function deriveShortName(fullName: string): string {
+  const cleaned = fullName.trim();
+  if (!cleaned) return 'ভল্ট';
+  const parts = cleaned.split(/\s+/);
+  return parts.length > 2 ? parts.slice(0, 2).join(' ') : cleaned;
 }
+
+export function getVaultDisplayName(
+  vaultConfig: VaultConfigMap,
+  bucketId: BucketId,
+  withOrder = false
+): string {
+  const name = vaultConfig[bucketId]?.name?.trim() || BUCKET_BY_ID[bucketId].name;
+  return withOrder ? `${BUCKET_BY_ID[bucketId].orderLabel} ${name}` : name;
+}
+

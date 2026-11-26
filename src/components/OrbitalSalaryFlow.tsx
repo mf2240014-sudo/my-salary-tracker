@@ -1,29 +1,34 @@
-import {Home, PiggyBank, Utensils, Wallet} from 'lucide-react';
+import {Home, Pencil, PiggyBank, Utensils, Wallet} from 'lucide-react';
 import {
+  BucketId,
   BucketsMap,
   IncomeSetupConfig,
-  OFFICE_FOOD_QUICK_AMOUNTS,
+  VaultConfigMap,
 } from '../types/budget';
 import {formatBDT, formatNumber} from '../utils/format';
 
 interface OrbitalSalaryFlowProps {
   setup: IncomeSetupConfig;
   buckets: BucketsMap;
+  vaultConfig: VaultConfigMap;
   totalAllocated: number;
   privacyMasked: boolean;
   onOpenIncomeSetup: () => void;
+  onEditVault: (bucketId: BucketId) => void;
   onTransferHomeAndSavings: (direction: 'toHome' | 'toSavings') => void;
-  onQuickOfficeFoodExpense: (amount: number) => void;
+  onQuickVaultExpense: (bucketId: BucketId, amount: number) => void;
 }
 
 export function OrbitalSalaryFlow({
   setup,
   buckets,
+  vaultConfig,
   totalAllocated,
   privacyMasked,
   onOpenIncomeSetup,
+  onEditVault,
   onTransferHomeAndSavings,
-  onQuickOfficeFoodExpense,
+  onQuickVaultExpense,
 }: OrbitalSalaryFlowProps) {
   const overtime =
     Math.max(0, setup.offDaysCount) * Math.max(0, setup.offDayRate);
@@ -203,13 +208,24 @@ export function OrbitalSalaryFlow({
             }}
             className="rounded-2xl backdrop-blur-md border border-violet-500/45 p-4 sm:p-5 shadow-[0_0_28px_rgba(139,92,246,0.18)]"
           >
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-xl bg-violet-500/20 border border-violet-400/40 text-violet-300 flex items-center justify-center shrink-0 shadow-[0_0_12px_rgba(139,92,246,0.3)]">
-                <Home className="w-4 h-4" aria-hidden="true" />
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-xl bg-violet-500/20 border border-violet-400/40 text-violet-300 flex items-center justify-center shrink-0 shadow-[0_0_12px_rgba(139,92,246,0.3)]">
+                  <Home className="w-4 h-4" aria-hidden="true" />
+                </div>
+                <h3 className="text-sm sm:text-base font-bold text-white leading-[1.5] truncate">
+                  ১. {vaultConfig.home.name}
+                </h3>
               </div>
-              <h3 className="text-sm sm:text-base font-bold text-white leading-[1.5]">
-                ১. বাসায় দেওয়া ভল্ট
-              </h3>
+              <button
+                type="button"
+                onClick={() => onEditVault('home')}
+                aria-label={`${vaultConfig.home.name} এডিট করুন`}
+                title="নাম ও কুইক বাটন এডিট করুন"
+                className="min-h-[32px] min-w-[32px] inline-flex items-center justify-center rounded-lg text-slate-300/80 hover:text-white hover:bg-white/10 transition-colors shrink-0 cursor-pointer"
+              >
+                <Pencil className="w-3.5 h-3.5" aria-hidden="true" />
+              </button>
             </div>
 
             <div className="mt-3.5 flex items-baseline justify-between gap-3">
@@ -225,7 +241,7 @@ export function OrbitalSalaryFlow({
                 <button
                   type="button"
                   onClick={() => onTransferHomeAndSavings('toHome')}
-                  title="মূল সঞ্চয় থেকে ১,০০০ টাকা বাসার ভল্টে আনুন"
+                  title={`${vaultConfig.savings.shortName} থেকে ১,০০০ টাকা ${vaultConfig.home.shortName}-এ আনুন`}
                   className="min-h-[34px] px-2.5 py-1 text-xs font-bold font-num rounded-lg bg-violet-500/25 hover:bg-violet-500/40 text-violet-100 border border-violet-400/45 transition-colors cursor-pointer"
                 >
                   +১,০০০
@@ -233,13 +249,29 @@ export function OrbitalSalaryFlow({
                 <button
                   type="button"
                   onClick={() => onTransferHomeAndSavings('toSavings')}
-                  title="বাসার ভল্ট থেকে ১,০০০ টাকা মূল সঞ্চয়ে পাঠান"
+                  title={`${vaultConfig.home.shortName} থেকে ১,০০০ টাকা ${vaultConfig.savings.shortName}-এ পাঠান`}
                   className="min-h-[34px] px-2.5 py-1 text-xs font-bold font-num rounded-lg bg-white/8 hover:bg-violet-500/25 text-slate-200 border border-white/15 transition-colors cursor-pointer"
                 >
                   -১,০০০
                 </button>
               </div>
             </div>
+
+            {vaultConfig.home.quickAmounts.length > 0 && (
+              <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+                {vaultConfig.home.quickAmounts.map((amt) => (
+                  <button
+                    key={amt}
+                    type="button"
+                    onClick={() => onQuickVaultExpense('home', amt)}
+                    title={`${vaultConfig.home.name} থেকে ${formatBDT(amt)} খরচ যোগ করুন`}
+                    className="min-h-[30px] px-2.5 py-0.5 text-xs font-bold font-num rounded-full bg-violet-500/20 hover:bg-violet-500/40 text-violet-100 border border-violet-400/45 transition-colors cursor-pointer"
+                  >
+                    -{formatNumber(amt)}
+                  </button>
+                ))}
+              </div>
+            )}
 
             <div className="mt-3.5 w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
               <div
@@ -259,26 +291,55 @@ export function OrbitalSalaryFlow({
             }}
             className="rounded-2xl backdrop-blur-md border border-emerald-500/45 p-4 sm:p-5 shadow-[0_0_28px_rgba(16,185,129,0.18)]"
           >
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 flex items-center justify-center shrink-0 shadow-[0_0_12px_rgba(16,185,129,0.3)]">
-                <PiggyBank className="w-4 h-4" aria-hidden="true" />
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 flex items-center justify-center shrink-0 shadow-[0_0_12px_rgba(16,185,129,0.3)]">
+                  <PiggyBank className="w-4 h-4" aria-hidden="true" />
+                </div>
+                <h3 className="text-sm sm:text-base font-bold text-white leading-[1.5] truncate">
+                  ৩. {vaultConfig.savings.name}
+                </h3>
               </div>
-              <h3 className="text-sm sm:text-base font-bold text-white leading-[1.5]">
-                ৩. মূল সঞ্চয় ভল্ট
-              </h3>
+              <button
+                type="button"
+                onClick={() => onEditVault('savings')}
+                aria-label={`${vaultConfig.savings.name} এডিট করুন`}
+                title="নাম ও কুইক বাটন এডিট করুন"
+                className="min-h-[32px] min-w-[32px] inline-flex items-center justify-center rounded-lg text-slate-300/80 hover:text-white hover:bg-white/10 transition-colors shrink-0 cursor-pointer"
+              >
+                <Pencil className="w-3.5 h-3.5" aria-hidden="true" />
+              </button>
             </div>
 
-            <div className="mt-3.5">
-              <div
-                className={`text-2xl font-bold font-num leading-[1.4] ${
-                  savingsRemaining < 0 ? 'text-rose-400' : 'text-emerald-300'
-                }`}
-              >
-                {formatBDT(savingsRemaining, privacyMasked)}
+            <div className="mt-3.5 flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <div
+                  className={`text-2xl font-bold font-num leading-[1.4] ${
+                    savingsRemaining < 0 ? 'text-rose-400' : 'text-emerald-300'
+                  }`}
+                >
+                  {formatBDT(savingsRemaining, privacyMasked)}
+                </div>
+                <p className="text-xs font-medium text-slate-200 leading-[1.5] mt-1">
+                  বাকি টাকার {formatNumber(savingsPct)}% সঞ্চয়
+                </p>
               </div>
-              <p className="text-xs font-medium text-slate-200 leading-[1.5] mt-1">
-                বাকি টাকার {formatNumber(savingsPct)}% সঞ্চয়
-              </p>
+
+              {vaultConfig.savings.quickAmounts.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5 shrink-0">
+                  {vaultConfig.savings.quickAmounts.map((amt) => (
+                    <button
+                      key={amt}
+                      type="button"
+                      onClick={() => onQuickVaultExpense('savings', amt)}
+                      title={`${vaultConfig.savings.name} থেকে ${formatBDT(amt)} খরচ যোগ করুন`}
+                      className="min-h-[32px] px-2.5 py-1 text-xs font-bold font-num rounded-full bg-emerald-500/20 hover:bg-emerald-500/40 text-emerald-100 border border-emerald-400/45 transition-colors cursor-pointer"
+                    >
+                      -{formatNumber(amt)}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="mt-3.5 w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
@@ -347,13 +408,24 @@ export function OrbitalSalaryFlow({
             }}
             className="rounded-2xl backdrop-blur-md border border-amber-500/45 p-4 sm:p-5 shadow-[0_0_28px_rgba(245,158,11,0.18)]"
           >
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-400/40 text-amber-300 flex items-center justify-center shrink-0 shadow-[0_0_12px_rgba(245,158,11,0.3)]">
-                <Utensils className="w-4 h-4" aria-hidden="true" />
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-400/40 text-amber-300 flex items-center justify-center shrink-0 shadow-[0_0_12px_rgba(245,158,11,0.3)]">
+                  <Utensils className="w-4 h-4" aria-hidden="true" />
+                </div>
+                <h3 className="text-sm sm:text-base font-bold text-white leading-[1.5] truncate">
+                  ২. {vaultConfig.officeFood.name}
+                </h3>
               </div>
-              <h3 className="text-sm sm:text-base font-bold text-white leading-[1.5]">
-                ২. অফিস খাবার ভল্ট
-              </h3>
+              <button
+                type="button"
+                onClick={() => onEditVault('officeFood')}
+                aria-label={`${vaultConfig.officeFood.name} এডিট করুন`}
+                title="নাম ও কুইক বাটন এডিট করুন"
+                className="min-h-[32px] min-w-[32px] inline-flex items-center justify-center rounded-lg text-slate-300/80 hover:text-white hover:bg-white/10 transition-colors shrink-0 cursor-pointer"
+              >
+                <Pencil className="w-3.5 h-3.5" aria-hidden="true" />
+              </button>
             </div>
 
             <div className="mt-3.5 flex flex-wrap items-center justify-between gap-2">
@@ -365,19 +437,21 @@ export function OrbitalSalaryFlow({
                 {formatBDT(officeRemaining, privacyMasked)}
               </div>
 
-              <div className="flex items-center gap-1.5 shrink-0">
-                {OFFICE_FOOD_QUICK_AMOUNTS.map((amt) => (
-                  <button
-                    key={amt}
-                    type="button"
-                    onClick={() => onQuickOfficeFoodExpense(amt)}
-                    title={`আজকের খাবার ${formatBDT(amt)} খরচ যোগ করুন`}
-                    className="min-h-[34px] px-2.5 py-1 text-xs font-bold font-num rounded-full bg-amber-500/20 hover:bg-amber-500/40 text-amber-100 border border-amber-400/45 transition-colors cursor-pointer"
-                  >
-                    -{formatNumber(amt)}
-                  </button>
-                ))}
-              </div>
+              {vaultConfig.officeFood.quickAmounts.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5 shrink-0">
+                  {vaultConfig.officeFood.quickAmounts.map((amt) => (
+                    <button
+                      key={amt}
+                      type="button"
+                      onClick={() => onQuickVaultExpense('officeFood', amt)}
+                      title={`${vaultConfig.officeFood.name} থেকে ${formatBDT(amt)} খরচ যোগ করুন`}
+                      className="min-h-[34px] px-2.5 py-1 text-xs font-bold font-num rounded-full bg-amber-500/20 hover:bg-amber-500/40 text-amber-100 border border-amber-400/45 transition-colors cursor-pointer"
+                    >
+                      -{formatNumber(amt)}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="mt-3.5 w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
@@ -401,26 +475,55 @@ export function OrbitalSalaryFlow({
             }}
             className="rounded-2xl backdrop-blur-md border border-cyan-500/45 p-4 sm:p-5 shadow-[0_0_28px_rgba(6,182,212,0.18)]"
           >
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-xl bg-cyan-500/20 border border-cyan-400/40 text-cyan-300 flex items-center justify-center shrink-0 shadow-[0_0_12px_rgba(6,182,212,0.3)]">
-                <Wallet className="w-4 h-4" aria-hidden="true" />
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-xl bg-cyan-500/20 border border-cyan-400/40 text-cyan-300 flex items-center justify-center shrink-0 shadow-[0_0_12px_rgba(6,182,212,0.3)]">
+                  <Wallet className="w-4 h-4" aria-hidden="true" />
+                </div>
+                <h3 className="text-sm sm:text-base font-bold text-white leading-[1.5] truncate">
+                  ৪. {vaultConfig.personal.name}
+                </h3>
               </div>
-              <h3 className="text-sm sm:text-base font-bold text-white leading-[1.5]">
-                ৪. নিজের হাতখরচ ভল্ট
-              </h3>
+              <button
+                type="button"
+                onClick={() => onEditVault('personal')}
+                aria-label={`${vaultConfig.personal.name} এডিট করুন`}
+                title="নাম ও কুইক বাটন এডিট করুন"
+                className="min-h-[32px] min-w-[32px] inline-flex items-center justify-center rounded-lg text-slate-300/80 hover:text-white hover:bg-white/10 transition-colors shrink-0 cursor-pointer"
+              >
+                <Pencil className="w-3.5 h-3.5" aria-hidden="true" />
+              </button>
             </div>
 
-            <div className="mt-3.5">
-              <div
-                className={`text-2xl font-bold font-num leading-[1.4] ${
-                  personalRemaining < 0 ? 'text-rose-400' : 'text-cyan-300'
-                }`}
-              >
-                {formatBDT(personalRemaining, privacyMasked)}
+            <div className="mt-3.5 flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <div
+                  className={`text-2xl font-bold font-num leading-[1.4] ${
+                    personalRemaining < 0 ? 'text-rose-400' : 'text-cyan-300'
+                  }`}
+                >
+                  {formatBDT(personalRemaining, privacyMasked)}
+                </div>
+                <p className="text-xs font-medium text-slate-200 leading-[1.5] mt-1">
+                  বাকি টাকার {formatNumber(personalPct)}% {vaultConfig.personal.shortName}
+                </p>
               </div>
-              <p className="text-xs font-medium text-slate-200 leading-[1.5] mt-1">
-                বাকি টাকার {formatNumber(personalPct)}% হাতখরচ
-              </p>
+
+              {vaultConfig.personal.quickAmounts.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5 shrink-0">
+                  {vaultConfig.personal.quickAmounts.map((amt) => (
+                    <button
+                      key={amt}
+                      type="button"
+                      onClick={() => onQuickVaultExpense('personal', amt)}
+                      title={`${vaultConfig.personal.name} থেকে ${formatBDT(amt)} খরচ যোগ করুন`}
+                      className="min-h-[32px] px-2.5 py-1 text-xs font-bold font-num rounded-full bg-cyan-500/20 hover:bg-cyan-500/40 text-cyan-100 border border-cyan-400/45 transition-colors cursor-pointer"
+                    >
+                      -{formatNumber(amt)}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="mt-3.5 w-full h-1.5 bg-white/10 rounded-full overflow-hidden">

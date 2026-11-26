@@ -1,6 +1,6 @@
 import {Camera, RotateCcw, User, X} from 'lucide-react';
 import {useRef, useState} from 'react';
-import {DEFAULT_AVATAR_URL, UserProfile} from '../types/budget';
+import {UserProfile} from '../types/budget';
 
 interface ProfileModalProps {
   isOpen: boolean;
@@ -40,14 +40,14 @@ export function ProfileModal({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSaveProfile({
-      name: name.trim() || 'মোহাম্মদ রাতুল',
-      avatarUrl: avatarUrl || DEFAULT_AVATAR_URL,
+      name: name.trim() || 'আমার অ্যাকাউন্ট',
+      avatarUrl,
     });
     onClose();
   };
 
   const handleResetAvatar = () => {
-    setAvatarUrl(DEFAULT_AVATAR_URL);
+    setAvatarUrl('');
     setImgError(false);
   };
 
@@ -108,14 +108,14 @@ export function ProfileModal({
                 <span>নতুন ছবি আপলোড</span>
               </button>
 
-              {avatarUrl !== DEFAULT_AVATAR_URL && (
+              {avatarUrl !== '' && (
                 <button
                   type="button"
                   onClick={handleResetAvatar}
                   className="min-h-[38px] px-3 py-1.5 inline-flex items-center gap-1.5 text-xs font-semibold text-slate-300 bg-white/5 hover:bg-white/10 border border-white/15 rounded-xl transition-colors cursor-pointer"
                 >
                   <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" />
-                  <span>ডিফল্ট ছবি</span>
+                  <span>ছবি সরান</span>
                 </button>
               )}
             </div>
@@ -143,7 +143,7 @@ export function ProfileModal({
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="মোহাম্মদ রাতুল"
+              placeholder="আপনার নাম লিখুন"
               className="w-full min-h-[44px] px-3.5 py-2 bg-[#070b14] border border-white/15 rounded-xl text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-400/40 focus:border-emerald-400"
             />
           </div>

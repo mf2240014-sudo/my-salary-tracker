@@ -1,9 +1,10 @@
 import {ArrowLeftRight, Home, PiggyBank, Trash2, Utensils, Wallet} from 'lucide-react';
-import {BUCKET_BY_ID, BucketId, TransactionRecord} from '../types/budget';
+import {BucketId, TransactionRecord, VaultConfigMap} from '../types/budget';
 import {formatBDT, formatBengaliDate} from '../utils/format';
 
 interface RecentTransactionsPanelProps {
   transactions: TransactionRecord[];
+  vaultConfig: VaultConfigMap;
   privacyMasked: boolean;
   onDeleteTransaction: (id: string) => void;
   onViewAllHistory: () => void;
@@ -47,6 +48,7 @@ function VaultIcon({bucketId, type}: {bucketId: BucketId; type: TransactionRecor
 
 export function RecentTransactionsPanel({
   transactions,
+  vaultConfig,
   privacyMasked,
   onDeleteTransaction,
   onViewAllHistory,
@@ -56,9 +58,9 @@ export function RecentTransactionsPanel({
   const getVaultLabel = (tx: TransactionRecord): string => {
     if (tx.type === 'salary') return 'মাসিক আয় বণ্টন';
     if (tx.type === 'transfer' && tx.toBucketId) {
-      return `${BUCKET_BY_ID[tx.bucketId].shortName} → ${BUCKET_BY_ID[tx.toBucketId].shortName}`;
+      return `${vaultConfig[tx.bucketId].shortName} → ${vaultConfig[tx.toBucketId].shortName}`;
     }
-    return BUCKET_BY_ID[tx.bucketId].name;
+    return vaultConfig[tx.bucketId].name;
   };
 
   return (

@@ -1,11 +1,12 @@
 import {Download, Search, Trash2} from 'lucide-react';
 import {useMemo, useState} from 'react';
 import {
-  BUCKET_BY_ID,
   BUCKET_LIST,
   BucketId,
+  getVaultDisplayName,
   TransactionRecord,
   TransactionType,
+  VaultConfigMap,
 } from '../types/budget';
 import {
   formatBDT,
@@ -17,6 +18,7 @@ import {
 
 interface FullTransactionsViewProps {
   transactions: TransactionRecord[];
+  vaultConfig: VaultConfigMap;
   privacyMasked: boolean;
   onDeleteTransaction: (id: string) => void;
   onExportCSV: () => void;
@@ -26,6 +28,7 @@ type TypeFilter = 'all' | TransactionType;
 
 export function FullTransactionsView({
   transactions,
+  vaultConfig,
   privacyMasked,
   onDeleteTransaction,
   onExportCSV,
@@ -61,8 +64,8 @@ export function FullTransactionsView({
         return false;
       }
       if (!q) return true;
-      const bName = BUCKET_BY_ID[tx.bucketId].name.toLowerCase();
-      const toBName = tx.toBucketId ? BUCKET_BY_ID[tx.toBucketId].name.toLowerCase() : '';
+      const bName = vaultConfig[tx.bucketId].name.toLowerCase();
+      const toBName = tx.toBucketId ? vaultConfig[tx.toBucketId].name.toLowerCase() : '';
       return (
         tx.note.toLowerCase().includes(q) ||
         bName.includes(q) ||
@@ -70,7 +73,7 @@ export function FullTransactionsView({
         tx.date.includes(q)
       );
     });
-  }, [transactions, searchQuery, typeFilter, bucketFilter, monthFilter]);
+  }, [transactions, vaultConfig, searchQuery, typeFilter, bucketFilter, monthFilter]);
 
   const filteredExpenseSum = useMemo(() => {
     return filtered
@@ -81,9 +84,9 @@ export function FullTransactionsView({
   const getBucketDisplay = (tx: TransactionRecord): string => {
     if (tx.type === 'salary') return 'সকল ভল্ট (মাসিক আয়)';
     if (tx.type === 'transfer' && tx.toBucketId) {
-      return `${BUCKET_BY_ID[tx.bucketId].name} → ${BUCKET_BY_ID[tx.toBucketId].name}`;
+      return `${vaultConfig[tx.bucketId].name} → ${vaultConfig[tx.toBucketId].name}`;
     }
-    return `${BUCKET_BY_ID[tx.bucketId].orderLabel} ${BUCKET_BY_ID[tx.bucketId].name}`;
+    return getVaultDisplayName(vaultConfig, tx.bucketId, true);
   };
 
   return (
@@ -184,7 +187,7 @@ export function FullTransactionsView({
             </option>
             {BUCKET_LIST.map((b) => (
               <option key={b.id} value={b.id} className="bg-[#0b1120]">
-                {b.orderLabel} {b.name}
+                {getVaultDisplayName(vaultConfig, b.id, true)}
               </option>
             ))}
           </select>

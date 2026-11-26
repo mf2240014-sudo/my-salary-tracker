@@ -4,8 +4,10 @@ import {
   Download,
   Eye,
   EyeOff,
+  FileJson,
   Menu,
   Sparkles,
+  Upload,
   User,
   Volume2,
   VolumeX,
@@ -26,12 +28,17 @@ import {RecentTransactionsPanel} from './components/RecentTransactionsPanel';
 import {ResetModal} from './components/ResetModal';
 import {SettingsView} from './components/SettingsView';
 import {NavSection, Sidebar} from './components/Sidebar';
+import {VaultEditModal} from './components/VaultEditModal';
+import {
+  OnboardingPayload,
+  WelcomeOnboardingModal,
+} from './components/WelcomeOnboardingModal';
 import {useOnlineStatus, usePWAInstall} from './hooks/usePWAInstall';
 import {
-  BUCKET_BY_ID,
   BUCKET_LIST,
   BucketId,
   BudgetAppState,
+  CustomVaultConfig,
   EMPTY_APP_STATE,
   IncomeSetupConfig,
   LoanRecord,
@@ -72,6 +79,8 @@ export default function App() {
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [isBackupMenuOpen, setIsBackupMenuOpen] = useState(false);
+  const [editingVaultId, setEditingVaultId] = useState<BucketId | null>(null);
   const [showIOSInstallModal, setShowIOSInstallModal] = useState(false);
   const [avatarImgError, setAvatarImgError] = useState(false);
   const [selectedExpenseBucket, setSelectedExpenseBucket] = useState<BucketId>('officeFood');
@@ -83,6 +92,8 @@ export default function App() {
   const expenseAmountRef = useRef<HTMLInputElement | null>(null);
   const toastTimerRef = useRef<number | null>(null);
   const notifContainerRef = useRef<HTMLDivElement | null>(null);
+  const backupContainerRef = useRef<HTMLDivElement | null>(null);
+  const headerJsonInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     saveBudgetState(state);
@@ -101,18 +112,27 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!isNotificationsOpen) return;
+    if (!isNotificationsOpen && !isBackupMenuOpen) return;
     const handleClickOutside = (event: MouseEvent) => {
       if (
+        isNotificationsOpen &&
         notifContainerRef.current &&
         !notifContainerRef.current.contains(event.target as Node)
       ) {
         setIsNotificationsOpen(false);
       }
+      if (
+        isBackupMenuOpen &&
+        backupContainerRef.current &&
+        !backupContainerRef.current.contains(event.target as Node)
+      ) {
+        setIsBackupMenuOpen(false);
+      }
     };
     const handleEsc = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         setIsNotificationsOpen(false);
+        setIsBackupMenuOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -121,7 +141,7 @@ export default function App() {
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('keydown', handleEsc);
     };
-  }, [isNotificationsOpen]);
+  }, [isNotificationsOpen, isBackupMenuOpen]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -424,17 +444,68 @@ export default function App() {
 
     playSoftClick(state.security.soundEnabled);
     showToast(
-      `${BUCKET_BY_ID[payload.bucketId].name} থেকে ${formatBDT(payload.amount, state.security.privacyMasked)} বিয়োগ হয়েছে।`
+      `${state.vaultConfig[payload.bucketId].name} থেকে ${formatBDT(payload.amount, state.security.privacyMasked)} বিয়োগ হয়েছে।`
     );
   };
 
-  const handleQuickOfficeFoodExpense = (amount: number) => {
+  const handleQuickVaultExpense = (bucketId: BucketId, amount: number) => {
     handleAddExpense({
-      bucketId: 'officeFood',
-      note: `দুপুরের খাবার (${formatBDT(amount)})`,
+      bucketId,
+      note: `${state.vaultConfig[bucketId].shortName} (${formatBDT(amount)})`,
       amount,
       date: getTodayISODate(),
     });
+  };
+
+  const handleSaveVaultConfig = (
+    bucketId: BucketId,
+    nextConfig: CustomVaultConfig
+  ) => {
+    setState((prev) => ({
+      ...prev,
+      vaultConfig: {
+        ...prev.vaultConfig,
+        [bucketId]: nextConfig,
+      },
+    }));
+    playSoftClick(state.security.soundEnabled);
+    showToast(`"${nextConfig.name}" ভল্টের সেটিংস সেভ করা হয়েছে।`);
+  };
+
+  const handleCompleteOnboarding = (payload: OnboardingPayload) => {
+    const today = getTodayISODate();
+    const extraIncome = payload.setup.overtimeIncome;
+    const initialSalaryTx: TransactionRecord = {
+      id: generateId(),
+      type: 'salary',
+      date: today,
+      createdAt: new Date().toISOString(),
+      bucketId: 'home',
+      note: `প্রাথমিক মাসিক আয় (বেসিক ${formatNumber(payload.setup.basicSalary)}${extraIncome > 0 ? ` + অতিরিক্ত ${formatNumber(extraIncome)}` : ''})`,
+      amount: payload.totalIncome,
+      salaryBreakdown: payload.breakdown,
+    };
+
+    setState((prev) => ({
+      ...prev,
+      onboardingCompleted: true,
+      profile: payload.profile,
+      setup: payload.setup,
+      vaultConfig: payload.vaultConfig,
+      savingsGoal: payload.savingsGoal,
+      buckets: {
+        home: {allocated: payload.breakdown.home, spent: 0},
+        officeFood: {allocated: payload.breakdown.officeFood, spent: 0},
+        savings: {allocated: payload.breakdown.savings, spent: 0},
+        personal: {allocated: payload.breakdown.personal, spent: 0},
+      },
+      transactions: [initialSalaryTx],
+    }));
+
+    playCoinChime(state.security.soundEnabled);
+    showToast(
+      `স্বাগতম ${payload.profile.name}! আপনার ৪টি কাস্টম ভল্ট তৈরি হয়েছে।`
+    );
   };
 
   const handleTransfer = (payload: {
@@ -473,7 +544,7 @@ export default function App() {
 
     playSoftClick(state.security.soundEnabled);
     showToast(
-      `${BUCKET_BY_ID[payload.fromBucketId].shortName} থেকে ${BUCKET_BY_ID[payload.toBucketId].shortName}-এ ${formatBDT(payload.amount, state.security.privacyMasked)} স্থানান্তর হয়েছে।`
+      `${state.vaultConfig[payload.fromBucketId].shortName} থেকে ${state.vaultConfig[payload.toBucketId].shortName}-এ ${formatBDT(payload.amount, state.security.privacyMasked)} স্থানান্তর হয়েছে।`
     );
   };
 
@@ -487,7 +558,7 @@ export default function App() {
 
     if (fromRemaining < stepAmount) {
       showToast(
-        `"${BUCKET_BY_ID[fromId].name}"-এ ${formatBDT(stepAmount, state.security.privacyMasked)} স্থানান্তরের জন্য পর্যাপ্ত ব্যালেন্স নেই।`
+        `"${state.vaultConfig[fromId].name}"-এ ${formatBDT(stepAmount, state.security.privacyMasked)} স্থানান্তরের জন্য পর্যাপ্ত ব্যালেন্স নেই।`
       );
       return;
     }
@@ -498,8 +569,8 @@ export default function App() {
       amount: stepAmount,
       note:
         direction === 'toHome'
-          ? 'মূল সঞ্চয় থেকে বাসায় বাড়তি ১,০০০ টাকা'
-          : 'বাসার ভল্ট থেকে মূল সঞ্চয়ে ১,০০০ টাকা',
+          ? `${state.vaultConfig.savings.shortName} থেকে ${state.vaultConfig.home.shortName}-এ ১,০০০ টাকা`
+          : `${state.vaultConfig.home.shortName} থেকে ${state.vaultConfig.savings.shortName}-এ ১,০০০ টাকা`,
       date: getTodayISODate(),
     });
   };
@@ -543,7 +614,7 @@ export default function App() {
     playSoftClick(state.security.soundEnabled);
     if (target.type === 'expense') {
       showToast(
-        `খরচ মুছে ফেলা হয়েছে এবং ${formatBDT(target.amount, state.security.privacyMasked)} "${BUCKET_BY_ID[target.bucketId].name}"-এ ফেরত দেওয়া হয়েছে।`
+        `খরচ মুছে ফেলা হয়েছে এবং ${formatBDT(target.amount, state.security.privacyMasked)} "${state.vaultConfig[target.bucketId].name}"-এ ফেরত দেওয়া হয়েছে।`
       );
     } else if (target.type === 'transfer') {
       showToast('ভল্ট সমন্বয় বাতিল করে পূর্বের অবস্থায় ফেরত নেওয়া হয়েছে।');
@@ -642,7 +713,7 @@ export default function App() {
     if (target.type === 'receivable' && targetVaultId !== 'none') {
       playCoinChime(state.security.soundEnabled);
       showToast(
-        `${target.personName}-এর ${formatBDT(target.amount, state.security.privacyMasked)} "${BUCKET_BY_ID[targetVaultId].name}"-এ যোগ করা হয়েছে!`
+        `${target.personName}-এর ${formatBDT(target.amount, state.security.privacyMasked)} "${state.vaultConfig[targetVaultId].name}"-এ যোগ করা হয়েছে!`
       );
     } else {
       playCoinChime(state.security.soundEnabled);
@@ -672,7 +743,9 @@ export default function App() {
     clearBudgetState();
     setState((prev) => ({
       ...EMPTY_APP_STATE,
+      onboardingCompleted: true,
       profile: prev.profile,
+      vaultConfig: prev.vaultConfig,
       security: prev.security,
     }));
     setIsResetModalOpen(false);
@@ -686,13 +759,14 @@ export default function App() {
       return;
     }
     playSoftClick(state.security.soundEnabled);
-    exportTransactionsToCSV(state.transactions);
+    exportTransactionsToCSV(state.transactions, state.vaultConfig);
     showToast('CSV ফাইল ডাউনলোড শুরু হয়েছে।');
   };
 
   const handleExportJSON = () => {
     playSoftClick(state.security.soundEnabled);
     exportBackupJSON(state);
+    setIsBackupMenuOpen(false);
     showToast('সম্পূর্ণ তথ্যের JSON ব্যাকআপ ডাউনলোড শুরু হয়েছে।');
   };
 
@@ -706,6 +780,7 @@ export default function App() {
         return;
       }
       setState(imported);
+      setIsBackupMenuOpen(false);
       playCoinChime(imported.security.soundEnabled);
       showToast('ব্যাকআপ থেকে আপনার সকল ভল্ট ও হিসাব পুনরুদ্ধার হয়েছে।');
     };
@@ -725,6 +800,27 @@ export default function App() {
           setIsUnlocked(true);
         }}
       />
+    );
+  }
+
+  if (!state.onboardingCompleted) {
+    return (
+      <>
+        <WelcomeOnboardingModal
+          onComplete={handleCompleteOnboarding}
+          onImportJSON={handleImportJSON}
+        />
+        {toastMessage && (
+          <div
+            role="status"
+            aria-live="polite"
+            className="fixed bottom-4 right-4 left-4 sm:left-auto sm:max-w-md z-50 bg-[#0d182e] border border-emerald-400/40 text-white px-4 py-3 rounded-2xl shadow-[0_0_25px_rgba(16,185,129,0.25)] flex items-center gap-2.5 text-sm font-medium"
+          >
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" aria-hidden="true" />
+            <span className="leading-[1.5]">{toastMessage}</span>
+          </div>
+        )}
+      </>
     );
   }
 
@@ -818,6 +914,59 @@ export default function App() {
                   <span>📲 অ্যাপ ইনস্টল</span>
                 </button>
               )}
+
+              {/* Header JSON Backup / Restore Dropdown */}
+              <div ref={backupContainerRef} className="relative">
+                <button
+                  type="button"
+                  onClick={() => setIsBackupMenuOpen((prev) => !prev)}
+                  aria-label="JSON ব্যাকআপ ও রিস্টোর"
+                  aria-expanded={isBackupMenuOpen}
+                  className="inline-flex items-center justify-center gap-1.5 min-h-[40px] px-2.5 sm:px-3 py-2 text-xs sm:text-sm font-semibold text-slate-100 bg-white/8 hover:bg-white/15 border border-white/15 rounded-xl transition-all whitespace-nowrap cursor-pointer"
+                >
+                  <FileJson className="w-4 h-4 text-emerald-300 shrink-0" aria-hidden="true" />
+                  <span className="hidden lg:inline">ব্যাকআপ</span>
+                </button>
+
+                {isBackupMenuOpen && (
+                  <div
+                    role="menu"
+                    aria-label="ডাটা ব্যাকআপ ও রিস্টোর মেনু"
+                    className="absolute right-0 mt-2.5 w-56 rounded-2xl bg-[#0b1324]/95 backdrop-blur-xl border border-white/15 shadow-[0_12px_40px_rgba(0,0,0,0.65)] p-2 z-50 space-y-1"
+                  >
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={handleExportJSON}
+                      className="w-full min-h-[40px] px-3 py-2 rounded-xl flex items-center gap-2 text-xs font-semibold text-emerald-300 hover:bg-emerald-500/15 transition-colors cursor-pointer"
+                    >
+                      <FileJson className="w-4 h-4 shrink-0" aria-hidden="true" />
+                      <span>JSON ব্যাকআপ সেভ করুন</span>
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => headerJsonInputRef.current?.click()}
+                      className="w-full min-h-[40px] px-3 py-2 rounded-xl flex items-center gap-2 text-xs font-semibold text-cyan-200 hover:bg-cyan-500/15 transition-colors cursor-pointer"
+                    >
+                      <Upload className="w-4 h-4 shrink-0" aria-hidden="true" />
+                      <span>ব্যাকআপ রিস্টোর (.json)</span>
+                    </button>
+                  </div>
+                )}
+                <input
+                  ref={headerJsonInputRef}
+                  type="file"
+                  accept="application/json,.json"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleImportJSON(file);
+                    e.target.value = '';
+                  }}
+                  className="hidden"
+                  aria-label="JSON ব্যাকআপ ফাইল নির্বাচন করুন"
+                />
+              </div>
 
               {/* CSV Download */}
               <button
@@ -963,11 +1112,13 @@ export default function App() {
               <OrbitalSalaryFlow
                 setup={state.setup}
                 buckets={state.buckets}
+                vaultConfig={state.vaultConfig}
                 totalAllocated={totals.totalAllocated}
                 privacyMasked={privacyMasked}
                 onOpenIncomeSetup={() => setIsIncomeModalOpen(true)}
+                onEditVault={(id) => setEditingVaultId(id)}
                 onTransferHomeAndSavings={handleTransferHomeAndSavings}
-                onQuickOfficeFoodExpense={handleQuickOfficeFoodExpense}
+                onQuickVaultExpense={handleQuickVaultExpense}
               />
 
               {/* Bottom 3-Column Interactive Grid (Equal Height h-full Panels) */}
@@ -975,12 +1126,14 @@ export default function App() {
                 <LiquidSavingsTank
                   savingsGoal={state.savingsGoal}
                   currentSavings={mainSavingsBalance}
+                  savingsVaultName={state.vaultConfig.savings.name}
                   privacyMasked={privacyMasked}
                   onChangeGoal={handleSavingsGoalChange}
                 />
 
                 <QuickExpensePanel
                   buckets={state.buckets}
+                  vaultConfig={state.vaultConfig}
                   selectedBucket={selectedExpenseBucket}
                   privacyMasked={privacyMasked}
                   onSelectBucket={setSelectedExpenseBucket}
@@ -990,6 +1143,7 @@ export default function App() {
 
                 <RecentTransactionsPanel
                   transactions={state.transactions}
+                  vaultConfig={state.vaultConfig}
                   privacyMasked={privacyMasked}
                   onDeleteTransaction={handleDeleteTransaction}
                   onViewAllHistory={() => setActiveView('history')}
@@ -1008,6 +1162,7 @@ export default function App() {
           {activeView === 'loans' && (
             <LoansView
               loans={state.loans}
+              vaultConfig={state.vaultConfig}
               privacyMasked={privacyMasked}
               onAddLoan={handleAddLoan}
               onSettleLoan={handleSettleLoan}
@@ -1018,6 +1173,7 @@ export default function App() {
           {activeView === 'history' && (
             <FullTransactionsView
               transactions={state.transactions}
+              vaultConfig={state.vaultConfig}
               privacyMasked={privacyMasked}
               onDeleteTransaction={handleDeleteTransaction}
               onExportCSV={handleExportCSV}
@@ -1027,6 +1183,7 @@ export default function App() {
           {activeView === 'settings' && (
             <SettingsView
               buckets={state.buckets}
+              vaultConfig={state.vaultConfig}
               savingsGoal={state.savingsGoal}
               privacyMasked={privacyMasked}
               security={state.security}
@@ -1038,6 +1195,10 @@ export default function App() {
               onLockNow={() => {
                 playSoftClick(state.security.soundEnabled);
                 setIsUnlocked(false);
+              }}
+              onReopenOnboarding={() => {
+                playSoftClick(state.security.soundEnabled);
+                setState((prev) => ({...prev, onboardingCompleted: false}));
               }}
               onTransfer={handleTransfer}
               onExportJSON={handleExportJSON}
@@ -1052,10 +1213,21 @@ export default function App() {
       <IncomeSetupModal
         isOpen={isIncomeModalOpen}
         setup={state.setup}
+        vaultConfig={state.vaultConfig}
         onClose={() => setIsIncomeModalOpen(false)}
         onChangeSetup={handleSetupChange}
         onUpdateCurrentMonthSalary={handleUpdateCurrentMonthSalary}
         onAddNewMonthSalary={handleAddNewMonthSalary}
+      />
+
+      {/* Vault Edit Modal */}
+      <VaultEditModal
+        key={editingVaultId ?? 'closed'}
+        isOpen={Boolean(editingVaultId)}
+        bucketId={editingVaultId}
+        vaultConfig={editingVaultId ? state.vaultConfig[editingVaultId] : null}
+        onClose={() => setEditingVaultId(null)}
+        onSave={handleSaveVaultConfig}
       />
 
       {/* AI Smart Monthly Report Modal */}
@@ -1063,6 +1235,7 @@ export default function App() {
         isOpen={isAIReportOpen}
         onClose={() => setIsAIReportOpen(false)}
         buckets={state.buckets}
+        vaultConfig={state.vaultConfig}
         savingsGoal={state.savingsGoal}
         loans={state.loans}
         privacyMasked={privacyMasked}

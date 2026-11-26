@@ -1,12 +1,15 @@
 import {
   BUCKET_BY_ID,
+  BucketId,
   BudgetAppState,
-  createInitialSeedState,
   DEFAULT_PROFILE,
   DEFAULT_SECURITY,
   DEFAULT_SETUP,
+  DEFAULT_VAULT_CONFIG,
+  deriveShortName,
   EMPTY_APP_STATE,
   TransactionRecord,
+  VaultConfigMap,
 } from '../types/budget';
 
 const STORAGE_KEY = 'bn_orbital_wealth_vault_v2';
@@ -81,6 +84,28 @@ export function formatBengaliMonth(yearMonth: string): string {
   }
 }
 
+function normalizeVaultEntry(
+  raw: Partial<{name: string; shortName: string; quickAmounts: number[]}> | undefined,
+  fallback: {name: string; shortName: string; quickAmounts: number[]}
+) {
+  const name =
+    typeof raw?.name === 'string' && raw.name.trim()
+      ? raw.name.trim()
+      : fallback.name;
+  const shortName =
+    typeof raw?.shortName === 'string' && raw.shortName.trim()
+      ? raw.shortName.trim()
+      : deriveShortName(name);
+  const quickAmounts = Array.isArray(raw?.quickAmounts)
+    ? raw.quickAmounts
+        .map((n) => Math.round(Number(n)))
+        .filter((n) => Number.isFinite(n) && n > 0)
+        .slice(0, 4)
+    : fallback.quickAmounts;
+
+  return {name, shortName, quickAmounts};
+}
+
 function normalizeBudgetState(parsed: Partial<BudgetAppState>): BudgetAppState {
   const mergedSetup = {
     ...DEFAULT_SETUP,
@@ -98,18 +123,65 @@ function normalizeBudgetState(parsed: Partial<BudgetAppState>): BudgetAppState {
   const rawPin = typeof parsed.security?.pinCode === 'string' ? parsed.security.pinCode : '';
   const validPin = /^\d{4}$/.test(rawPin) ? rawPin : '';
 
+  const buckets = {
+    home: {
+      allocated: Number(parsed.buckets?.home?.allocated) || 0,
+      spent: Number(parsed.buckets?.home?.spent) || 0,
+    },
+    officeFood: {
+      allocated: Number(parsed.buckets?.officeFood?.allocated) || 0,
+      spent: Number(parsed.buckets?.officeFood?.spent) || 0,
+    },
+    savings: {
+      allocated: Number(parsed.buckets?.savings?.allocated) || 0,
+      spent: Number(parsed.buckets?.savings?.spent) || 0,
+    },
+    personal: {
+      allocated: Number(parsed.buckets?.personal?.allocated) || 0,
+      spent: Number(parsed.buckets?.personal?.spent) || 0,
+    },
+  };
+
+  const hasLegacyActivity =
+    buckets.home.allocated > 0 ||
+    buckets.officeFood.allocated > 0 ||
+    buckets.savings.allocated > 0 ||
+    buckets.personal.allocated > 0 ||
+    (Array.isArray(parsed.transactions) && parsed.transactions.length > 0);
+
+  const onboardingCompleted =
+    typeof parsed.onboardingCompleted === 'boolean'
+      ? parsed.onboardingCompleted
+      : hasLegacyActivity;
+
+  const vaultConfig: VaultConfigMap = {
+    home: normalizeVaultEntry(parsed.vaultConfig?.home, DEFAULT_VAULT_CONFIG.home),
+    officeFood: normalizeVaultEntry(
+      parsed.vaultConfig?.officeFood,
+      DEFAULT_VAULT_CONFIG.officeFood
+    ),
+    savings: normalizeVaultEntry(
+      parsed.vaultConfig?.savings,
+      DEFAULT_VAULT_CONFIG.savings
+    ),
+    personal: normalizeVaultEntry(
+      parsed.vaultConfig?.personal,
+      DEFAULT_VAULT_CONFIG.personal
+    ),
+  };
+
   return {
+    onboardingCompleted,
     setup: mergedSetup,
     profile: {
       name:
         typeof parsed.profile?.name === 'string' && parsed.profile.name.trim()
-          ? parsed.profile.name
+          ? parsed.profile.name.trim()
           : DEFAULT_PROFILE.name,
       avatarUrl:
-        typeof parsed.profile?.avatarUrl === 'string' && parsed.profile.avatarUrl
-          ? parsed.profile.avatarUrl
-          : DEFAULT_PROFILE.avatarUrl,
+        typeof parsed.profile?.avatarUrl === 'string' ? parsed.profile.avatarUrl : '',
     },
+    vaultConfig,
     security: {
       pinEnabled: Boolean(parsed.security?.pinEnabled && validPin),
       pinCode: validPin,
@@ -125,24 +197,7 @@ function normalizeBudgetState(parsed: Partial<BudgetAppState>): BudgetAppState {
       parsed.savingsGoal >= 0
         ? parsed.savingsGoal
         : EMPTY_APP_STATE.savingsGoal,
-    buckets: {
-      home: {
-        allocated: Number(parsed.buckets?.home?.allocated) || 0,
-        spent: Number(parsed.buckets?.home?.spent) || 0,
-      },
-      officeFood: {
-        allocated: Number(parsed.buckets?.officeFood?.allocated) || 0,
-        spent: Number(parsed.buckets?.officeFood?.spent) || 0,
-      },
-      savings: {
-        allocated: Number(parsed.buckets?.savings?.allocated) || 0,
-        spent: Number(parsed.buckets?.savings?.spent) || 0,
-      },
-      personal: {
-        allocated: Number(parsed.buckets?.personal?.allocated) || 0,
-        spent: Number(parsed.buckets?.personal?.spent) || 0,
-      },
-    },
+    buckets,
     transactions: Array.isArray(parsed.transactions) ? parsed.transactions : [],
     loans: Array.isArray(parsed.loans) ? parsed.loans : [],
   };
@@ -152,12 +207,12 @@ export function loadBudgetState(): BudgetAppState {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
-      return createInitialSeedState(getTodayISODate());
+      return EMPTY_APP_STATE;
     }
     const parsed = JSON.parse(raw) as Partial<BudgetAppState>;
     return normalizeBudgetState(parsed);
   } catch {
-    return createInitialSeedState(getTodayISODate());
+    return EMPTY_APP_STATE;
   }
 }
 
@@ -171,7 +226,13 @@ export function saveBudgetState(state: BudgetAppState): void {
 
 export function clearBudgetState(): void {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(EMPTY_APP_STATE));
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        ...EMPTY_APP_STATE,
+        onboardingCompleted: true,
+      })
+    );
   } catch {
     // Ignore storage errors gracefully
   }
@@ -179,7 +240,7 @@ export function clearBudgetState(): void {
 
 export function exportBackupJSON(state: BudgetAppState): void {
   const payload = {
-    version: 3,
+    version: 4,
     exportedAt: new Date().toISOString(),
     data: state,
   };
@@ -203,13 +264,17 @@ export function parseBackupJSON(rawText: string): BudgetAppState | null {
     if (!candidate || typeof candidate !== 'object' || !candidate.buckets) {
       return null;
     }
-    const validBucketKeys = ['home', 'officeFood', 'savings', 'personal'] as const;
+    const validBucketKeys: BucketId[] = ['home', 'officeFood', 'savings', 'personal'];
     for (const key of validBucketKeys) {
       if (!candidate.buckets[key] || typeof candidate.buckets[key] !== 'object') {
         return null;
       }
     }
-    return normalizeBudgetState(candidate);
+    const normalized = normalizeBudgetState(candidate);
+    return {
+      ...normalized,
+      onboardingCompleted: true,
+    };
   } catch {
     return null;
   }
@@ -220,16 +285,22 @@ function escapeCSVField(value: string): string {
   return `"${escaped}"`;
 }
 
-export function exportTransactionsToCSV(transactions: TransactionRecord[]): void {
+export function exportTransactionsToCSV(
+  transactions: TransactionRecord[],
+  vaultConfig: VaultConfigMap = DEFAULT_VAULT_CONFIG
+): void {
   const headers = ['তারিখ', 'ধরন', 'ভল্ট', 'বিবরণ / নোট', 'পরিমাণ (টাকা)'];
 
   const rows = transactions.map((tx) => {
+    const bucketName = vaultConfig[tx.bucketId]?.name || BUCKET_BY_ID[tx.bucketId].name;
     let typeLabel = 'খরচ';
-    let bucketLabel = `${BUCKET_BY_ID[tx.bucketId].orderLabel} ${BUCKET_BY_ID[tx.bucketId].name}`;
+    let bucketLabel = `${BUCKET_BY_ID[tx.bucketId].orderLabel} ${bucketName}`;
 
     if (tx.type === 'transfer' && tx.toBucketId) {
+      const toName =
+        vaultConfig[tx.toBucketId]?.name || BUCKET_BY_ID[tx.toBucketId].name;
       typeLabel = 'সমন্বয়';
-      bucketLabel = `${BUCKET_BY_ID[tx.bucketId].name} → ${BUCKET_BY_ID[tx.toBucketId].name}`;
+      bucketLabel = `${bucketName} → ${toName}`;
     } else if (tx.type === 'salary') {
       typeLabel = 'মাসিক আয়';
       bucketLabel = 'সকল ভল্ট';

@@ -1,10 +1,16 @@
 import {PlusCircle, RefreshCw, X} from 'lucide-react';
-import {BucketId, HOME_QUICK_AMOUNTS, IncomeSetupConfig} from '../types/budget';
+import {
+  BucketId,
+  HOME_QUICK_AMOUNTS,
+  IncomeSetupConfig,
+  VaultConfigMap,
+} from '../types/budget';
 import {formatBDT, formatNumber} from '../utils/format';
 
 interface IncomeSetupModalProps {
   isOpen: boolean;
   setup: IncomeSetupConfig;
+  vaultConfig: VaultConfigMap;
   onClose: () => void;
   onChangeSetup: (next: IncomeSetupConfig) => void;
   onUpdateCurrentMonthSalary: (
@@ -20,6 +26,7 @@ interface IncomeSetupModalProps {
 export function IncomeSetupModal({
   isOpen,
   setup,
+  vaultConfig,
   onClose,
   onChangeSetup,
   onUpdateCurrentMonthSalary,
@@ -209,7 +216,7 @@ export function IncomeSetupModal({
               htmlFor="modal-home"
               className="block text-sm font-semibold text-slate-200 leading-[1.5] mb-1.5"
             >
-              বাসায় দেওয়া (৳)
+              ১. {vaultConfig.home.name} (৳)
             </label>
             <input
               id="modal-home"
@@ -249,7 +256,7 @@ export function IncomeSetupModal({
               htmlFor="modal-office-food"
               className="block text-sm font-semibold text-slate-200 leading-[1.5] mb-1.5"
             >
-              অফিস খাবার (৳)
+              ২. {vaultConfig.officeFood.name} (৳)
             </label>
             <input
               id="modal-office-food"
@@ -297,11 +304,11 @@ export function IncomeSetupModal({
                 />
                 <div className="grid grid-cols-2 gap-3 text-xs font-medium text-slate-300">
                   <div className="bg-white/5 rounded-xl px-3 py-2">
-                    মূল সঞ্চয় ({formatNumber(savingsPct)}%):{' '}
+                    {vaultConfig.savings.shortName} ({formatNumber(savingsPct)}%):{' '}
                     <strong className="text-emerald-300 font-num">{formatBDT(savingsAmount)}</strong>
                   </div>
                   <div className="bg-white/5 rounded-xl px-3 py-2 text-right">
-                    নিজের হাতখরচ ({formatNumber(personalPct)}%):{' '}
+                    {vaultConfig.personal.shortName} ({formatNumber(personalPct)}%):{' '}
                     <strong className="text-cyan-300 font-num">{formatBDT(personalAmount)}</strong>
                   </div>
                 </div>

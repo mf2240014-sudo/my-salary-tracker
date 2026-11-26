@@ -9,22 +9,25 @@ import {
 } from 'lucide-react';
 import {useRef, useState} from 'react';
 import {
-  BUCKET_BY_ID,
   BUCKET_LIST,
   BucketId,
   BucketsMap,
+  getVaultDisplayName,
   SecuritySettings,
+  VaultConfigMap,
 } from '../types/budget';
 import {formatBDT, getTodayISODate} from '../utils/format';
 
 interface SettingsViewProps {
   buckets: BucketsMap;
+  vaultConfig: VaultConfigMap;
   savingsGoal: number;
   privacyMasked: boolean;
   security: SecuritySettings;
   onChangeGoal: (nextGoal: number) => void;
   onUpdateSecurity: (next: Partial<SecuritySettings>, message?: string) => void;
   onLockNow: () => void;
+  onReopenOnboarding: () => void;
   onTransfer: (payload: {
     fromBucketId: BucketId;
     toBucketId: BucketId;
@@ -39,12 +42,14 @@ interface SettingsViewProps {
 
 export function SettingsView({
   buckets,
+  vaultConfig,
   savingsGoal,
   privacyMasked,
   security,
   onChangeGoal,
   onUpdateSecurity,
   onLockNow,
+  onReopenOnboarding,
   onTransfer,
   onExportJSON,
   onImportJSON,
@@ -76,7 +81,7 @@ export function SettingsView({
     }
     if (numericAmount > fromRemaining) {
       setError(
-        `"${BUCKET_BY_ID[fromBucket].name}"-এ পর্যাপ্ত ব্যালেন্স নেই (বর্তমান: ${formatBDT(fromRemaining)})।`
+        `"${vaultConfig[fromBucket].name}"-এ পর্যাপ্ত ব্যালেন্স নেই (বর্তমান: ${formatBDT(fromRemaining, privacyMasked)})।`
       );
       return;
     }
@@ -87,7 +92,7 @@ export function SettingsView({
       amount: numericAmount,
       note:
         note.trim() ||
-        `${BUCKET_BY_ID[fromBucket].shortName} থেকে ${BUCKET_BY_ID[toBucket].shortName}-এ সমন্বয়`,
+        `${vaultConfig[fromBucket].shortName} থেকে ${vaultConfig[toBucket].shortName}-এ সমন্বয়`,
       date: getTodayISODate(),
     });
     setAmount('');
@@ -187,7 +192,7 @@ export function SettingsView({
                   const rem = buckets[b.id].allocated - buckets[b.id].spent;
                   return (
                     <option key={b.id} value={b.id} className="bg-[#0b1120]">
-                      {b.orderLabel} {b.name} ({formatBDT(rem, privacyMasked)})
+                      {getVaultDisplayName(vaultConfig, b.id, true)} ({formatBDT(rem, privacyMasked)})
                     </option>
                   );
                 })}
@@ -214,7 +219,7 @@ export function SettingsView({
                   const rem = buckets[b.id].allocated - buckets[b.id].spent;
                   return (
                     <option key={b.id} value={b.id} className="bg-[#0b1120]">
-                      {b.orderLabel} {b.name} ({formatBDT(rem, privacyMasked)})
+                      {getVaultDisplayName(vaultConfig, b.id, true)} ({formatBDT(rem, privacyMasked)})
                     </option>
                   );
                 })}
@@ -344,7 +349,15 @@ export function SettingsView({
           </div>
         </div>
 
-        <div className="pt-4 border-t border-white/10">
+        <div className="pt-4 border-t border-white/10 grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <button
+            type="button"
+            onClick={onReopenOnboarding}
+            className="w-full min-h-[46px] px-4 py-2.5 inline-flex items-center justify-center gap-2 text-sm font-bold text-cyan-200 bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-400/35 rounded-xl transition-colors cursor-pointer"
+          >
+            <span>নতুন সেটআপ / টেমপ্লেট উইজার্ড</span>
+          </button>
+
           <button
             type="button"
             onClick={onRequestReset}
