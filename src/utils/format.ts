@@ -12,7 +12,7 @@ import {
   VaultConfigMap,
 } from '../types/budget';
 
-const STORAGE_KEY = 'bn_orbital_wealth_vault_v2';
+export const STORAGE_KEY = 'bn_orbital_wealth_vault_v2';
 
 const BN_DIGITS = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'] as const;
 
@@ -106,7 +106,7 @@ function normalizeVaultEntry(
   return {name, shortName, quickAmounts};
 }
 
-function normalizeBudgetState(parsed: Partial<BudgetAppState>): BudgetAppState {
+export function normalizeBudgetState(parsed: Partial<BudgetAppState>): BudgetAppState {
   const mergedSetup = {
     ...DEFAULT_SETUP,
     ...(parsed.setup ?? {}),

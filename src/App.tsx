@@ -6,15 +6,18 @@ import {
   EyeOff,
   FileJson,
   Menu,
+  Smartphone,
   Sparkles,
   Upload,
   User,
+  UserPlus,
   Volume2,
   VolumeX,
   WifiOff,
   X,
 } from 'lucide-react';
 import {useEffect, useMemo, useRef, useState} from 'react';
+import {AccountTransferModal} from './components/AccountTransferModal';
 import {AISmartReportModal} from './components/AISmartReportModal';
 import {FullTransactionsView} from './components/FullTransactionsView';
 import {IncomeSetupModal} from './components/IncomeSetupModal';
@@ -23,6 +26,8 @@ import {LoansSummaryWidget, LoansView} from './components/LoansView';
 import {OrbitalSalaryFlow} from './components/OrbitalSalaryFlow';
 import {PinLockScreen} from './components/PinLockScreen';
 import {ProfileModal} from './components/ProfileModal';
+import {PublicAuthPortal} from './components/PublicAuthPortal';
+import {PublicFooter} from './components/PublicFooter';
 import {QuickExpensePanel} from './components/QuickExpensePanel';
 import {RecentTransactionsPanel} from './components/RecentTransactionsPanel';
 import {ResetModal} from './components/ResetModal';
@@ -35,6 +40,7 @@ import {
 } from './components/WelcomeOnboardingModal';
 import {useOnlineStatus, usePWAInstall} from './hooks/usePWAInstall';
 import {
+  AccountsRegistry,
   BUCKET_LIST,
   BucketId,
   BudgetAppState,
@@ -47,17 +53,23 @@ import {
   TransactionRecord,
   UserProfile,
 } from './types/budget';
+import {
+  enterGuestMode,
+  loadAccountsRegistry,
+  loginLocalAccount,
+  registerLocalAccount,
+  saveAccountsRegistry,
+  upsertRestoredAccount,
+} from './utils/accounts';
+import {decryptAccountSyncCode} from './utils/cryptoSync';
 import {playCoinChime, playSoftClick} from './utils/feedback';
 import {
-  clearBudgetState,
   exportBackupJSON,
   exportTransactionsToCSV,
   formatBDT,
   formatNumber,
   getTodayISODate,
-  loadBudgetState,
   parseBackupJSON,
-  saveBudgetState,
 } from './utils/format';
 
 function generateId(): string {
@@ -68,7 +80,38 @@ function generateId(): string {
 }
 
 export default function App() {
-  const [state, setState] = useState<BudgetAppState>(() => loadBudgetState());
+  const [registry, setRegistry] = useState<AccountsRegistry>(() => loadAccountsRegistry());
+  const activeAccount = useMemo(
+    () => registry.accounts.find((a) => a.id === registry.activeAccountId) ?? null,
+    [registry]
+  );
+  const state = activeAccount?.state ?? EMPTY_APP_STATE;
+
+  const setState = (
+    updater: BudgetAppState | ((prev: BudgetAppState) => BudgetAppState)
+  ) => {
+    setRegistry((prevReg) => {
+      if (!prevReg.activeAccountId) return prevReg;
+      const now = new Date().toISOString();
+      const nextAccounts = prevReg.accounts.map((acc) => {
+        if (acc.id !== prevReg.activeAccountId) return acc;
+        const nextState =
+          typeof updater === 'function' ? updater(acc.state) : updater;
+        return {
+          ...acc,
+          updatedAt: now,
+          state: nextState,
+        };
+      });
+      const nextReg: AccountsRegistry = {
+        ...prevReg,
+        accounts: nextAccounts,
+      };
+      saveAccountsRegistry(nextReg);
+      return nextReg;
+    });
+  };
+
   const [isUnlocked, setIsUnlocked] = useState<boolean>(
     () => !(state.security.pinEnabled && state.security.pinCode.length === 4)
   );
@@ -77,6 +120,7 @@ export default function App() {
   const [isIncomeModalOpen, setIsIncomeModalOpen] = useState(false);
   const [isAIReportOpen, setIsAIReportOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isBackupMenuOpen, setIsBackupMenuOpen] = useState(false);
@@ -94,10 +138,6 @@ export default function App() {
   const notifContainerRef = useRef<HTMLDivElement | null>(null);
   const backupContainerRef = useRef<HTMLDivElement | null>(null);
   const headerJsonInputRef = useRef<HTMLInputElement | null>(null);
-
-  useEffect(() => {
-    saveBudgetState(state);
-  }, [state]);
 
   useEffect(() => {
     setAvatarImgError(false);
@@ -740,7 +780,6 @@ export default function App() {
   };
 
   const handleConfirmReset = () => {
-    clearBudgetState();
     setState((prev) => ({
       ...EMPTY_APP_STATE,
       onboardingCompleted: true,
@@ -751,6 +790,74 @@ export default function App() {
     setIsResetModalOpen(false);
     playSoftClick(state.security.soundEnabled);
     showToast('সব ভল্টের ব্যালেন্স ও তালিকা রিসেট করা হয়েছে।');
+  };
+
+  const handleRegisterAccount = async (payload: {
+    username: string;
+    displayName: string;
+    password: string;
+  }) => {
+    const res = await registerLocalAccount(registry, payload);
+    setRegistry(res.registry);
+    setIsUnlocked(true);
+    setActiveView('dashboard');
+    playCoinChime(true);
+    showToast(`স্বাগতম ${payload.displayName}! এখন আপনার ৪টি ভল্ট সেটআপ করুন।`);
+  };
+
+  const handleLoginAccount = async (payload: {
+    username: string;
+    password: string;
+  }) => {
+    const res = await loginLocalAccount(registry, payload);
+    setRegistry(res.registry);
+    setIsUnlocked(true);
+    setActiveView('dashboard');
+    playCoinChime(res.account.state.security.soundEnabled);
+    showToast(`স্বাগতম ${res.account.state.profile.name}!`);
+  };
+
+  const handleRestoreFromSyncCode = async (payload: {
+    syncCode: string;
+    username: string;
+    password: string;
+  }) => {
+    const decrypted = await decryptAccountSyncCode(payload);
+    const res = await upsertRestoredAccount(registry, {
+      username: decrypted.username,
+      displayUsername: decrypted.displayUsername,
+      password: payload.password,
+      state: decrypted.state,
+    });
+    setRegistry(res.registry);
+    setIsUnlocked(true);
+    setActiveView('dashboard');
+    playCoinChime(res.account.state.security.soundEnabled);
+    showToast('অন্য ডিভাইস থেকে আপনার সম্পূর্ণ অ্যাকাউন্ট সফলভাবে আনলক হয়েছে!');
+  };
+
+  const handleEnterGuestMode = () => {
+    const res = enterGuestMode(registry);
+    setRegistry(res.registry);
+    setIsUnlocked(true);
+    setActiveView('dashboard');
+    playSoftClick(true);
+    showToast('অতিথি ডেমো মোডে স্বাগতম! নিজের অ্যাকাউন্ট খুলতে উপরের বাটনে ক্লিক করুন।');
+  };
+
+  const handleSwitchAccount = () => {
+    setIsProfileModalOpen(false);
+    setIsTransferModalOpen(false);
+    setIsMobileSidebarOpen(false);
+    setRegistry((prevReg) => {
+      const nextReg: AccountsRegistry = {
+        ...prevReg,
+        activeAccountId: null,
+      };
+      saveAccountsRegistry(nextReg);
+      return nextReg;
+    });
+    playSoftClick(state.security.soundEnabled);
   };
 
   const handleExportCSV = () => {
@@ -790,6 +897,30 @@ export default function App() {
     reader.readAsText(file, 'utf-8');
   };
 
+  if (!activeAccount) {
+    return (
+      <>
+        <PublicAuthPortal
+          savedAccounts={registry.accounts}
+          onRegister={handleRegisterAccount}
+          onLogin={handleLoginAccount}
+          onRestoreFromSyncCode={handleRestoreFromSyncCode}
+          onEnterGuestMode={handleEnterGuestMode}
+        />
+        {toastMessage && (
+          <div
+            role="status"
+            aria-live="polite"
+            className="fixed bottom-4 right-4 left-4 sm:left-auto sm:max-w-md z-50 bg-[#0d182e] border border-emerald-400/40 text-white px-4 py-3 rounded-2xl shadow-[0_0_25px_rgba(16,185,129,0.25)] flex items-center gap-2.5 text-sm font-medium"
+          >
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" aria-hidden="true" />
+            <span className="leading-[1.5]">{toastMessage}</span>
+          </div>
+        )}
+      </>
+    );
+  }
+
   if (state.security.pinEnabled && state.security.pinCode.length === 4 && !isUnlocked) {
     return (
       <PinLockScreen
@@ -807,8 +938,10 @@ export default function App() {
     return (
       <>
         <WelcomeOnboardingModal
+          initialName={state.profile.name}
           onComplete={handleCompleteOnboarding}
           onImportJSON={handleImportJSON}
+          onBackToAuth={handleSwitchAccount}
         />
         {toastMessage && (
           <div
@@ -856,6 +989,15 @@ export default function App() {
           playSoftClick(state.security.soundEnabled);
           setIsAIReportOpen(true);
         }}
+        onOpenTransferModal={() => {
+          playSoftClick(state.security.soundEnabled);
+          setIsTransferModalOpen(true);
+        }}
+        onSwitchAccount={handleSwitchAccount}
+        accountDisplayName={state.profile.name}
+        accountHandle={
+          activeAccount.isGuest ? 'অতিথি' : `@${activeAccount.displayUsername}`
+        }
         canInstallPWA={canInstallPWA}
         onInstallPWA={handleInstallPWA}
       />
@@ -901,6 +1043,21 @@ export default function App() {
                 <Sparkles className="w-4 h-4 text-cyan-300 shrink-0" aria-hidden="true" />
                 <span className="hidden md:inline">✨ এআই স্মার্ট রিপোর্ট</span>
                 <span className="md:hidden hidden sm:inline">রিপোর্ট</span>
+              </button>
+
+              {/* Portable Account Sync Code Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  playSoftClick(state.security.soundEnabled);
+                  setIsTransferModalOpen(true);
+                }}
+                title="📲 অ্যাকাউন্ট ট্রান্সফার / সিঙ্ক কোড"
+                aria-label="অ্যাকাউন্ট ট্রান্সফার / সিঙ্ক কোড"
+                className="inline-flex items-center justify-center gap-1.5 min-h-[40px] px-2.5 sm:px-3 py-2 text-xs font-bold text-emerald-200 bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-400/35 rounded-xl transition-all whitespace-nowrap shrink-0 cursor-pointer"
+              >
+                <Smartphone className="w-4 h-4 text-emerald-300 shrink-0" aria-hidden="true" />
+                <span className="hidden md:inline">📲 সিঙ্ক কোড</span>
               </button>
 
               {/* PWA Install Button (when installable) */}
@@ -1102,6 +1259,22 @@ export default function App() {
               <span>অফলাইন মোড চালু — আপনার সকল হিসাব ডিভাইসে নিরাপদে সংরক্ষিত আছে</span>
             </div>
           )}
+
+          {activeAccount.isGuest && (
+            <div className="bg-cyan-500/12 border-t border-cyan-400/25 px-4 py-2 flex flex-wrap items-center justify-center gap-3 text-xs font-semibold text-cyan-100">
+              <span>
+                অতিথি / ডেমো মোডে আছেন — নিজের স্বাধীন স্যালারি ও ভল্ট সংরক্ষণ করতে নিজস্ব অ্যাকাউন্ট খুলুন
+              </span>
+              <button
+                type="button"
+                onClick={handleSwitchAccount}
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-gradient-to-r from-emerald-400 to-cyan-400 text-[#041210] font-bold hover:from-emerald-300 hover:to-cyan-300 transition-colors cursor-pointer"
+              >
+                <UserPlus className="w-3.5 h-3.5" aria-hidden="true" />
+                <span>নিজস্ব অ্যাকাউন্ট তৈরি করুন</span>
+              </button>
+            </div>
+          )}
         </header>
 
         {/* Main Viewport */}
@@ -1203,9 +1376,12 @@ export default function App() {
               onTransfer={handleTransfer}
               onExportJSON={handleExportJSON}
               onImportJSON={handleImportJSON}
+              onOpenTransferModal={() => setIsTransferModalOpen(true)}
               onRequestReset={() => setIsResetModalOpen(true)}
             />
           )}
+
+          <PublicFooter />
         </main>
       </div>
 
@@ -1241,13 +1417,26 @@ export default function App() {
         privacyMasked={privacyMasked}
       />
 
+      {/* Account Transfer / Sync Code Modal */}
+      <AccountTransferModal
+        key={`${activeAccount.id}-${isTransferModalOpen}`}
+        isOpen={isTransferModalOpen}
+        account={activeAccount}
+        onClose={() => setIsTransferModalOpen(false)}
+        onToast={showToast}
+      />
+
       {/* Profile Modal */}
       <ProfileModal
-        key={`${state.profile.name}-${isProfileModalOpen}`}
+        key={`${activeAccount.id}-${state.profile.name}-${isProfileModalOpen}`}
         isOpen={isProfileModalOpen}
         profile={state.profile}
+        displayUsername={activeAccount.displayUsername}
+        isGuest={activeAccount.isGuest}
         onClose={() => setIsProfileModalOpen(false)}
         onSaveProfile={handleSaveProfile}
+        onOpenTransferModal={() => setIsTransferModalOpen(true)}
+        onSwitchAccount={handleSwitchAccount}
       />
 
       {/* Reset Confirmation Modal */}

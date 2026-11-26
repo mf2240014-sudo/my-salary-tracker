@@ -85,6 +85,22 @@ export interface BudgetAppState {
   loans: LoanRecord[];
 }
 
+export interface LocalAccountRecord {
+  id: string;
+  username: string;
+  displayUsername: string;
+  passwordHash: string;
+  isGuest?: boolean;
+  createdAt: string;
+  updatedAt: string;
+  state: BudgetAppState;
+}
+
+export interface AccountsRegistry {
+  activeAccountId: string | null;
+  accounts: LocalAccountRecord[];
+}
+
 export const BUCKET_LIST: BucketMeta[] = [
   {
     id: 'home',

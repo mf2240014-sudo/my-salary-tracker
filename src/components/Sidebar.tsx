@@ -3,9 +3,11 @@ import {
   Handshake,
   LayoutDashboard,
   ListOrdered,
+  LogOut,
   PlusCircle,
   ReceiptText,
   Settings,
+  Smartphone,
   Sparkles,
   X,
 } from 'lucide-react';
@@ -20,6 +22,10 @@ interface SidebarProps {
   onOpenIncomeSetup: () => void;
   onFocusDailyExpense: () => void;
   onOpenAIReport: () => void;
+  onOpenTransferModal: () => void;
+  onSwitchAccount: () => void;
+  accountDisplayName: string;
+  accountHandle: string;
   canInstallPWA: boolean;
   onInstallPWA: () => void;
 }
@@ -32,6 +38,10 @@ export function Sidebar({
   onOpenIncomeSetup,
   onFocusDailyExpense,
   onOpenAIReport,
+  onOpenTransferModal,
+  onSwitchAccount,
+  accountDisplayName,
+  accountHandle,
   canInstallPWA,
   onInstallPWA,
 }: SidebarProps) {
@@ -133,7 +143,7 @@ export function Sidebar({
             <span className="whitespace-nowrap">লেনদেনের তালিকা</span>
           </button>
 
-          <div className="pt-2">
+          <div className="pt-2 space-y-2">
             <button
               type="button"
               onClick={() => {
@@ -145,11 +155,23 @@ export function Sidebar({
               <Sparkles className="w-4 h-4 shrink-0 text-cyan-300" aria-hidden="true" />
               <span className="whitespace-nowrap">✨ এআই স্মার্ট রিপোর্ট</span>
             </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                onOpenTransferModal();
+                onCloseMobile();
+              }}
+              className="w-full min-h-[42px] px-3.5 py-2 rounded-xl flex items-center gap-2.5 text-xs font-bold text-emerald-200 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-400/30 transition-all cursor-pointer"
+            >
+              <Smartphone className="w-4 h-4 shrink-0 text-emerald-300" aria-hidden="true" />
+              <span className="truncate">📲 সিঙ্ক / ট্রান্সফার কোড</span>
+            </button>
           </div>
         </nav>
       </div>
 
-      {/* Bottom Install & Settings / Reset */}
+      {/* Bottom Install, Account Switch & Settings */}
       <div className="pt-4 border-t border-white/10 space-y-2">
         {canInstallPWA && (
           <button
@@ -179,6 +201,24 @@ export function Sidebar({
         >
           <Settings className="w-4 h-4 shrink-0" aria-hidden="true" />
           <span className="whitespace-nowrap">রিসেট / সেটিংস</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            onSwitchAccount();
+            onCloseMobile();
+          }}
+          title={`${accountDisplayName} (${accountHandle})`}
+          className="w-full min-h-[42px] px-3.5 py-2 rounded-xl flex items-center justify-between gap-2 text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/5 border border-white/10 transition-all cursor-pointer"
+        >
+          <span className="flex items-center gap-2 min-w-0">
+            <LogOut className="w-3.5 h-3.5 text-amber-300 shrink-0" aria-hidden="true" />
+            <span className="truncate">অ্যাকাউন্ট পরিবর্তন</span>
+          </span>
+          <span className="text-[11px] text-slate-400 truncate max-w-[80px]">
+            {accountHandle}
+          </span>
         </button>
       </div>
     </div>

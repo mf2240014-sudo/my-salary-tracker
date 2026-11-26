@@ -20,8 +20,10 @@ export interface OnboardingPayload {
 }
 
 interface WelcomeOnboardingModalProps {
+  initialName?: string;
   onComplete: (payload: OnboardingPayload) => void;
   onImportJSON: (file: File) => void;
+  onBackToAuth?: () => void;
 }
 
 interface QuickTemplate {
@@ -92,11 +94,13 @@ const QUICK_TEMPLATES: QuickTemplate[] = [
 ];
 
 export function WelcomeOnboardingModal({
+  initialName = '',
   onComplete,
   onImportJSON,
+  onBackToAuth,
 }: WelcomeOnboardingModalProps) {
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
-  const [name, setName] = useState('');
+  const [name, setName] = useState(initialName);
   const [avatarUrl, setAvatarUrl] = useState('');
   const [basicSalary, setBasicSalary] = useState('');
   const [extraIncome, setExtraIncome] = useState('');
@@ -268,14 +272,26 @@ export function WelcomeOnboardingModal({
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={() => backupInputRef.current?.click()}
-            className="min-h-[40px] px-3.5 py-2 inline-flex items-center justify-center gap-1.5 text-xs font-semibold text-cyan-200 bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-400/35 rounded-xl transition-colors whitespace-nowrap shrink-0 cursor-pointer"
-          >
-            <Upload className="w-3.5 h-3.5" aria-hidden="true" />
-            <span>ব্যাকআপ (.json) রিস্টোর</span>
-          </button>
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            {onBackToAuth && (
+              <button
+                type="button"
+                onClick={onBackToAuth}
+                className="min-h-[40px] px-3 py-2 inline-flex items-center justify-center text-xs font-semibold text-slate-300 bg-white/5 hover:bg-white/10 border border-white/15 rounded-xl transition-colors whitespace-nowrap cursor-pointer"
+              >
+                অ্যাকাউন্ট স্ক্রিনে ফিরুন
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => backupInputRef.current?.click()}
+              className="min-h-[40px] px-3.5 py-2 inline-flex items-center justify-center gap-1.5 text-xs font-semibold text-cyan-200 bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-400/35 rounded-xl transition-colors whitespace-nowrap cursor-pointer"
+            >
+              <Upload className="w-3.5 h-3.5" aria-hidden="true" />
+              <span>ব্যাকআপ (.json) রিস্টোর</span>
+            </button>
+          </div>
           <input
             ref={backupInputRef}
             type="file"

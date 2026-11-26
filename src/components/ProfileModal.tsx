@@ -1,19 +1,34 @@
-import {Camera, RotateCcw, User, X} from 'lucide-react';
+import {
+  Camera,
+  LogOut,
+  RotateCcw,
+  Smartphone,
+  User,
+  X,
+} from 'lucide-react';
 import {useRef, useState} from 'react';
 import {UserProfile} from '../types/budget';
 
 interface ProfileModalProps {
   isOpen: boolean;
   profile: UserProfile;
+  displayUsername: string;
+  isGuest?: boolean;
   onClose: () => void;
   onSaveProfile: (next: UserProfile) => void;
+  onOpenTransferModal: () => void;
+  onSwitchAccount: () => void;
 }
 
 export function ProfileModal({
   isOpen,
   profile,
+  displayUsername,
+  isGuest,
   onClose,
   onSaveProfile,
+  onOpenTransferModal,
+  onSwitchAccount,
 }: ProfileModalProps) {
   const [name, setName] = useState(profile.name);
   const [avatarUrl, setAvatarUrl] = useState(profile.avatarUrl);
@@ -56,19 +71,19 @@ export function ProfileModal({
       role="dialog"
       aria-modal="true"
       aria-labelledby="profile-modal-title"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm overflow-y-auto"
     >
-      <div className="w-full max-w-md rounded-3xl bg-[#0b1324] border border-emerald-400/30 shadow-[0_0_45px_rgba(16,185,129,0.2)] p-5 sm:p-6">
+      <div className="w-full max-w-md rounded-3xl bg-[#0b1324] border border-emerald-400/30 shadow-[0_0_45px_rgba(16,185,129,0.2)] p-5 sm:p-6 my-auto">
         <div className="flex items-start justify-between gap-3 pb-4 border-b border-white/10">
           <div>
             <h2
               id="profile-modal-title"
               className="text-lg font-bold text-white leading-[1.5]"
             >
-              প্রোফাইল ও ছবি সেটিংস
+              প্রোফাইল ও অ্যাকাউন্ট
             </h2>
             <p className="text-xs font-medium text-slate-300 leading-[1.5]">
-              আপনার নাম ও প্রোফাইল ছবি পরিবর্তন করুন
+              {isGuest ? 'অতিথি ডেমো মোড' : `ইউজারনেম: @${displayUsername}`}
             </p>
           </div>
           <button
@@ -148,7 +163,7 @@ export function ProfileModal({
             />
           </div>
 
-          <div className="flex items-center justify-end gap-2.5 pt-2">
+          <div className="flex items-center justify-end gap-2.5">
             <button
               type="button"
               onClick={onClose}
@@ -164,6 +179,33 @@ export function ProfileModal({
             </button>
           </div>
         </form>
+
+        {/* Portable Account Actions */}
+        <div className="mt-5 pt-4 border-t border-white/10 space-y-2.5">
+          <button
+            type="button"
+            onClick={() => {
+              onClose();
+              onOpenTransferModal();
+            }}
+            className="w-full min-h-[44px] px-4 py-2 inline-flex items-center justify-center gap-2 text-xs sm:text-sm font-bold text-cyan-200 bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-400/35 rounded-xl transition-colors cursor-pointer"
+          >
+            <Smartphone className="w-4 h-4 shrink-0" aria-hidden="true" />
+            <span>📲 অ্যাকাউন্ট ট্রান্সফার / সিঙ্ক কোড</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              onClose();
+              onSwitchAccount();
+            }}
+            className="w-full min-h-[42px] px-4 py-2 inline-flex items-center justify-center gap-2 text-xs sm:text-sm font-semibold text-slate-200 bg-white/5 hover:bg-white/10 border border-white/15 rounded-xl transition-colors cursor-pointer"
+          >
+            <LogOut className="w-4 h-4 shrink-0 text-amber-300" aria-hidden="true" />
+            <span>অ্যাকাউন্ট পরিবর্তন / লগআউট</span>
+          </button>
+        </div>
       </div>
     </div>
   );
