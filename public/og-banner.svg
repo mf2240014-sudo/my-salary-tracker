@@ -1,0 +1,116 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <defs>
+    <linearGradient id="bgSlate" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#152028" />
+      <stop offset="100%" stop-color="#0b1218" />
+    </linearGradient>
+    <radialGradient id="amberGlow" cx="25%" cy="50%" r="48%">
+      <stop offset="0%" stop-color="#f59e0b" stop-opacity="0.18" />
+      <stop offset="100%" stop-color="#152028" stop-opacity="0" />
+    </radialGradient>
+    <linearGradient id="goldMain" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#eab308" />
+      <stop offset="55%" stop-color="#f59e0b" />
+      <stop offset="100%" stop-color="#fbbf24" />
+    </linearGradient>
+    <linearGradient id="goldDeep" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f59e0b" />
+      <stop offset="100%" stop-color="#d97706" />
+    </linearGradient>
+  </defs>
+
+  <!-- Dark Slate Canvas -->
+  <rect width="1200" height="630" fill="url(#bgSlate)" />
+  <rect width="1200" height="630" fill="url(#amberGlow)" />
+
+  <!-- Subtle Hairline Frame -->
+  <rect
+    x="28"
+    y="28"
+    width="1144"
+    height="574"
+    rx="32"
+    fill="none"
+    stroke="#ffffff"
+    stroke-opacity="0.08"
+    stroke-width="2"
+  />
+
+  <!-- App Logo Tile (Left) -->
+  <g transform="translate(88, 139)">
+    <rect
+      width="352"
+      height="352"
+      rx="78"
+      fill="#152028"
+      stroke="#f59e0b"
+      stroke-opacity="0.35"
+      stroke-width="3"
+    />
+    <g transform="scale(0.6875)">
+      <rect x="96" y="362" width="110" height="30" rx="15" fill="url(#goldDeep)" />
+      <rect x="96" y="320" width="110" height="30" rx="15" fill="url(#goldMain)" />
+      <rect x="96" y="278" width="110" height="30" rx="15" fill="url(#goldDeep)" />
+      <rect x="96" y="236" width="110" height="30" rx="15" fill="#fbbf24" />
+
+      <rect x="234" y="286" width="44" height="106" rx="10" fill="#eab308" />
+      <rect x="298" y="232" width="44" height="160" rx="10" fill="#f59e0b" />
+      <rect x="362" y="178" width="44" height="214" rx="10" fill="#fbbf24" />
+
+      <path
+        d="M126 196 L236 144 L274 166 L392 104"
+        fill="none"
+        stroke="url(#goldMain)"
+        stroke-width="22"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      />
+      <path
+        d="M342 98 L398 102 L386 156"
+        fill="none"
+        stroke="#fbbf24"
+        stroke-width="22"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      />
+    </g>
+  </g>
+
+  <!-- Brand Typography (Right) -->
+  <g transform="translate(492, 210)">
+    <rect x="0" y="0" width="76" height="5" rx="2.5" fill="url(#goldMain)" />
+
+    <text
+      x="0"
+      y="74"
+      font-family="'Hind Siliguri', 'Noto Sans Bengali', sans-serif"
+      font-weight="700"
+      font-size="58"
+      fill="#ffffff"
+    >
+      অরবিটাল ওয়েলথ ভল্ট
+    </text>
+
+    <text
+      x="0"
+      y="142"
+      font-family="'Hind Siliguri', 'Noto Sans Bengali', sans-serif"
+      font-weight="600"
+      font-size="34"
+      fill="#fbbf24"
+    >
+      স্মার্ট স্যালারি ও সেভিংস ট্র্যাকার
+    </text>
+
+    <text
+      x="0"
+      y="220"
+      font-family="'Hind Siliguri', 'Noto Sans Bengali', sans-serif"
+      font-weight="500"
+      font-size="24"
+      fill="#cbd5e1"
+    >
+      ৪টি কাস্টম ভল্ট  •  দৈনিক হিসাব  •  ১০০% অফলাইন ও সুরক্ষিত
+    </text>
+  </g>
+</svg>

@@ -16,6 +16,7 @@ export default defineConfig(() => {
         manifestFilename: 'manifest.json',
         includeAssets: [
           'icon.svg',
+          'og-banner.svg',
           'apple-touch-icon.png',
           'pwa-192x192.png',
           'pwa-512x512.png',
@@ -35,7 +36,7 @@ export default defineConfig(() => {
           icons: [
             {
               src: '/icon.svg',
-              sizes: 'any',
+              sizes: '192x192 512x512',
               type: 'image/svg+xml',
               purpose: 'any',
             },
