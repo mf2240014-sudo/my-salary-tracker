@@ -1,0 +1,133 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --font-bengali: "Hind Siliguri", "Noto Sans Bengali", sans-serif;
+  }
+
+  html,
+  body {
+    font-family: "Hind Siliguri", "Noto Sans Bengali", sans-serif;
+    background-color: #070b14;
+    color: #e2e8f0;
+    line-height: 1.5;
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  label,
+  button,
+  input,
+  select,
+  textarea {
+    font-family: "Hind Siliguri", "Noto Sans Bengali", sans-serif;
+    line-height: 1.5;
+  }
+}
+
+.font-num {
+  font-family: "Hind Siliguri", "Noto Sans Bengali", sans-serif;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* Custom range slider for dark vault UI */
+input[type="range"].vault-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 8px;
+  border-radius: 9999px;
+  outline: none;
+}
+
+input[type="range"].vault-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 9999px;
+  background: #10b981;
+  border: 3px solid #0b1324;
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.7);
+  cursor: pointer;
+  transition: transform 150ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+input[type="range"].vault-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.12);
+}
+
+input[type="range"].vault-slider::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+  border-radius: 9999px;
+  background: #10b981;
+  border: 3px solid #0b1324;
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.7);
+  cursor: pointer;
+}
+
+/* Animated orbital energy pulse along SVG connector paths */
+@keyframes energyFlow {
+  0% {
+    stroke-dashoffset: 120;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+.animate-energy-flow {
+  stroke-dasharray: 18 42;
+  animation: energyFlow 2.2s linear infinite;
+}
+
+@keyframes orbitalSpin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-orbital-spin {
+  animation: orbitalSpin 24s linear infinite;
+}
+
+/* Liquid capsule wave motion */
+@keyframes waveSlide {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-wave-slide {
+  animation: waveSlide 4.5s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .animate-energy-flow,
+  .animate-orbital-spin,
+  .animate-wave-slide {
+    animation: none;
+  }
+}
