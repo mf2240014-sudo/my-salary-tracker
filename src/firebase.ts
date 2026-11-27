@@ -1,4 +1,4 @@
-import {initializeApp} from 'firebase/app';
+import {getApp, getApps, initializeApp} from 'firebase/app';
 import {
   createUserWithEmailAndPassword,
   getAuth,
@@ -22,7 +22,7 @@ import {
 import {BudgetAppState} from './types/budget';
 import {normalizeBudgetState} from './utils/format';
 
-const firebaseConfig = {
+export const firebaseConfig = {
   apiKey: 'AIzaSyDmwuGGN_bGVzPisnx_T9SzehAydzCrzCc',
   authDomain: 'orbital-vault.firebaseapp.com',
   projectId: 'orbital-vault',
@@ -31,7 +31,7 @@ const firebaseConfig = {
   appId: '1:756866523354:web:aba909922fbe0216f885e3',
 };
 
-const app = initializeApp(firebaseConfig);
+const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 
 export const auth = getAuth(app);
 export const db = getFirestore(app);
@@ -59,6 +59,10 @@ export function mapFirebaseAuthError(error: unknown): string {
     typeof error === 'object' && error !== null && 'code' in error
       ? String((error as {code?: unknown}).code)
       : '';
+
+  if (code.startsWith('auth/api-key-not-valid')) {
+    return 'Firebase Authentication-এর জন্য API Key-টি এখনো সক্রিয় নয় (Identity Toolkit API অনুমতি প্রয়োজন)। অনুগ্রহ করে Google Cloud Console > APIs & Services > Credentials-এ গিয়ে এই API Key-র "API restrictions"-এ Identity Toolkit API যুক্ত করুন অথবা Firebase Console থেকে Authentication চালু করে নতুন Web API Key দিন।';
+  }
 
   switch (code) {
     case 'auth/popup-closed-by-user':
