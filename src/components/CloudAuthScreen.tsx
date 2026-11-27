@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import {useState} from 'react';
 import {
+  extractFirebaseErrorDetails,
   loginWithEmail,
   loginWithGooglePopup,
   mapFirebaseAuthError,
@@ -37,22 +38,40 @@ export function CloudAuthScreen({onEnterGuestMode}: CloudAuthScreenProps) {
   const [isEmailLoading, setIsEmailLoading] = useState(false);
   const [isResetLoading, setIsResetLoading] = useState(false);
   const [error, setError] = useState('');
+  const [rawError, setRawError] = useState<{code: string; message: string} | null>(
+    null
+  );
   const [infoMessage, setInfoMessage] = useState('');
+
+  const clearErrors = () => {
+    setError('');
+    setRawError(null);
+  };
+
+  const applyFirebaseError = (err: unknown) => {
+    setError(mapFirebaseAuthError(err));
+    const details = extractFirebaseErrorDetails(err);
+    if (details.code || details.message) {
+      setRawError(details);
+    } else {
+      setRawError(null);
+    }
+  };
 
   const switchMode = (nextMode: AuthMode) => {
     setMode(nextMode);
-    setError('');
+    clearErrors();
     setInfoMessage('');
   };
 
   const handleGoogleSignIn = async () => {
-    setError('');
+    clearErrors();
     setInfoMessage('');
     setIsGoogleLoading(true);
     try {
       await loginWithGooglePopup();
     } catch (err) {
-      setError(mapFirebaseAuthError(err));
+      applyFirebaseError(err);
     } finally {
       setIsGoogleLoading(false);
     }
@@ -60,7 +79,7 @@ export function CloudAuthScreen({onEnterGuestMode}: CloudAuthScreenProps) {
 
   const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    clearErrors();
     setInfoMessage('');
 
     const trimmedEmail = email.trim();
@@ -83,7 +102,7 @@ export function CloudAuthScreen({onEnterGuestMode}: CloudAuthScreenProps) {
       try {
         await registerWithEmail(trimmedEmail, password, name.trim());
       } catch (err) {
-        setError(mapFirebaseAuthError(err));
+        applyFirebaseError(err);
       } finally {
         setIsEmailLoading(false);
       }
@@ -99,14 +118,14 @@ export function CloudAuthScreen({onEnterGuestMode}: CloudAuthScreenProps) {
     try {
       await loginWithEmail(trimmedEmail, password);
     } catch (err) {
-      setError(mapFirebaseAuthError(err));
+      applyFirebaseError(err);
     } finally {
       setIsEmailLoading(false);
     }
   };
 
   const handleForgotPassword = async () => {
-    setError('');
+    clearErrors();
     setInfoMessage('');
     const trimmedEmail = email.trim();
     if (!trimmedEmail || !trimmedEmail.includes('@')) {
@@ -121,7 +140,7 @@ export function CloudAuthScreen({onEnterGuestMode}: CloudAuthScreenProps) {
         `${trimmedEmail} ঠিকানায় পাসওয়ার্ড রিসেট লিংক পাঠানো হয়েছে। ইনবক্স বা স্প্যাম ফোল্ডার চেক করুন।`
       );
     } catch (err) {
-      setError(mapFirebaseAuthError(err));
+      applyFirebaseError(err);
     } finally {
       setIsResetLoading(false);
     }
@@ -306,7 +325,7 @@ export function CloudAuthScreen({onEnterGuestMode}: CloudAuthScreenProps) {
                       value={name}
                       onChange={(e) => {
                         setName(e.target.value);
-                        setError('');
+                        clearErrors();
                       }}
                       placeholder="যেমন: তানভীর আহমেদ"
                       className="w-full min-h-[44px] px-3.5 py-2 bg-[#070b14] border border-white/15 rounded-xl text-white placeholder:text-slate-400 focus:outline-none focus:border-emerald-400"
@@ -333,7 +352,7 @@ export function CloudAuthScreen({onEnterGuestMode}: CloudAuthScreenProps) {
                       value={email}
                       onChange={(e) => {
                         setEmail(e.target.value);
-                        setError('');
+                        clearErrors();
                         setInfoMessage('');
                       }}
                       placeholder="name@example.com"
@@ -371,7 +390,7 @@ export function CloudAuthScreen({onEnterGuestMode}: CloudAuthScreenProps) {
                       value={password}
                       onChange={(e) => {
                         setPassword(e.target.value);
-                        setError('');
+                        clearErrors();
                       }}
                       placeholder={
                         mode === 'register' ? 'কমপক্ষে ৬ অক্ষরের পাসওয়ার্ড' : 'আপনার পাসওয়ার্ড দিন'
@@ -408,7 +427,7 @@ export function CloudAuthScreen({onEnterGuestMode}: CloudAuthScreenProps) {
                       value={confirmPassword}
                       onChange={(e) => {
                         setConfirmPassword(e.target.value);
-                        setError('');
+                        clearErrors();
                       }}
                       placeholder="পুনরায় পাসওয়ার্ড লিখুন"
                       className="w-full min-h-[44px] px-3.5 py-2 bg-[#070b14] border border-white/15 rounded-xl text-white placeholder:text-slate-400 focus:outline-none focus:border-emerald-400"
@@ -417,12 +436,28 @@ export function CloudAuthScreen({onEnterGuestMode}: CloudAuthScreenProps) {
                 )}
 
                 {error && (
-                  <p
+                  <div
                     role="alert"
-                    className="text-xs sm:text-sm font-semibold text-rose-300 bg-rose-500/15 border border-rose-500/30 px-3.5 py-2.5 rounded-xl"
+                    className="text-xs sm:text-sm font-semibold text-rose-200 bg-rose-500/15 border border-rose-500/35 px-3.5 py-2.5 rounded-xl space-y-1.5"
                   >
-                    {error}
-                  </p>
+                    <p>{error}</p>
+                    {rawError && (
+                      <div className="pt-1.5 border-t border-rose-400/25 text-[11px] sm:text-xs font-mono text-rose-300/95 break-all space-y-0.5">
+                        {rawError.code && (
+                          <p>
+                            <span className="font-bold text-rose-200">error.code:</span>{' '}
+                            {rawError.code}
+                          </p>
+                        )}
+                        {rawError.message && (
+                          <p>
+                            <span className="font-bold text-rose-200">error.message:</span>{' '}
+                            {rawError.message}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 )}
 
                 {infoMessage && (

@@ -54,11 +54,25 @@ function sanitizeForFirestore<T>(value: T): T {
   return value;
 }
 
-export function mapFirebaseAuthError(error: unknown): string {
+export function extractFirebaseErrorDetails(error: unknown): {
+  code: string;
+  message: string;
+} {
   const code =
     typeof error === 'object' && error !== null && 'code' in error
-      ? String((error as {code?: unknown}).code)
+      ? String((error as {code?: unknown}).code ?? '')
       : '';
+  const message =
+    typeof error === 'object' && error !== null && 'message' in error
+      ? String((error as {message?: unknown}).message ?? '')
+      : error instanceof Error
+        ? error.message
+        : String(error ?? '');
+  return {code, message};
+}
+
+export function mapFirebaseAuthError(error: unknown): string {
+  const {code, message} = extractFirebaseErrorDetails(error);
 
   if (code.startsWith('auth/api-key-not-valid')) {
     return 'Firebase Authentication-এর জন্য API Key-টি এখনো সক্রিয় নয় (Identity Toolkit API অনুমতি প্রয়োজন)। অনুগ্রহ করে Google Cloud Console > APIs & Services > Credentials-এ গিয়ে এই API Key-র "API restrictions"-এ Identity Toolkit API যুক্ত করুন অথবা Firebase Console থেকে Authentication চালু করে নতুন Web API Key দিন।';
@@ -92,9 +106,7 @@ export function mapFirebaseAuthError(error: unknown): string {
     case 'auth/unauthorized-domain':
       return 'এই ডোমেইনটি Firebase Authentication Authorized Domains তালিকায় যুক্ত নেই।';
     default:
-      return error instanceof Error && error.message
-        ? error.message
-        : 'লগইন করতে সমস্যা হয়েছে। আবার চেষ্টা করুন।';
+      return message || 'লগইন করতে সমস্যা হয়েছে। আবার চেষ্টা করুন।';
   }
 }
 
