@@ -5,7 +5,6 @@ import {
   RotateCcw,
   ShieldCheck,
   ShieldOff,
-  Smartphone,
   Upload,
 } from 'lucide-react';
 import {useRef, useState} from 'react';
@@ -38,7 +37,6 @@ interface SettingsViewProps {
   }) => void;
   onExportJSON: () => void;
   onImportJSON: (file: File) => void;
-  onOpenTransferModal: () => void;
   onRequestReset: () => void;
 }
 
@@ -55,7 +53,6 @@ export function SettingsView({
   onTransfer,
   onExportJSON,
   onImportJSON,
-  onOpenTransferModal,
   onRequestReset,
 }: SettingsViewProps) {
   const [fromBucket, setFromBucket] = useState<BucketId>('savings');
@@ -350,15 +347,6 @@ export function SettingsView({
               aria-label="JSON ব্যাকআপ ফাইল নির্বাচন করুন"
             />
           </div>
-
-          <button
-            type="button"
-            onClick={onOpenTransferModal}
-            className="mt-3 w-full min-h-[44px] px-4 py-2.5 inline-flex items-center justify-center gap-2 text-xs sm:text-sm font-bold text-cyan-200 bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-400/35 rounded-xl transition-colors cursor-pointer"
-          >
-            <Smartphone className="w-4 h-4 shrink-0" aria-hidden="true" />
-            <span>📲 অ্যাকাউন্ট ট্রান্সফার / সিঙ্ক কোড তৈরি করুন</span>
-          </button>
         </div>
 
         <div className="pt-4 border-t border-white/10 grid grid-cols-1 sm:grid-cols-2 gap-3">

@@ -21,6 +21,7 @@ export interface OnboardingPayload {
 
 interface WelcomeOnboardingModalProps {
   initialName?: string;
+  initialAvatarUrl?: string;
   onComplete: (payload: OnboardingPayload) => void;
   onImportJSON: (file: File) => void;
   onBackToAuth?: () => void;
@@ -95,13 +96,14 @@ const QUICK_TEMPLATES: QuickTemplate[] = [
 
 export function WelcomeOnboardingModal({
   initialName = '',
+  initialAvatarUrl = '',
   onComplete,
   onImportJSON,
   onBackToAuth,
 }: WelcomeOnboardingModalProps) {
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [name, setName] = useState(initialName);
-  const [avatarUrl, setAvatarUrl] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState(initialAvatarUrl);
   const [basicSalary, setBasicSalary] = useState('');
   const [extraIncome, setExtraIncome] = useState('');
 

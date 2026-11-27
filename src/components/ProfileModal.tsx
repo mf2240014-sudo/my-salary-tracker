@@ -1,8 +1,8 @@
 import {
   Camera,
+  LogIn,
   LogOut,
   RotateCcw,
-  Smartphone,
   User,
   X,
 } from 'lucide-react';
@@ -12,23 +12,21 @@ import {UserProfile} from '../types/budget';
 interface ProfileModalProps {
   isOpen: boolean;
   profile: UserProfile;
-  displayUsername: string;
+  accountEmail?: string | null;
   isGuest?: boolean;
   onClose: () => void;
   onSaveProfile: (next: UserProfile) => void;
-  onOpenTransferModal: () => void;
-  onSwitchAccount: () => void;
+  onLogout: () => void;
 }
 
 export function ProfileModal({
   isOpen,
   profile,
-  displayUsername,
+  accountEmail,
   isGuest,
   onClose,
   onSaveProfile,
-  onOpenTransferModal,
-  onSwitchAccount,
+  onLogout,
 }: ProfileModalProps) {
   const [name, setName] = useState(profile.name);
   const [avatarUrl, setAvatarUrl] = useState(profile.avatarUrl);
@@ -80,10 +78,12 @@ export function ProfileModal({
               id="profile-modal-title"
               className="text-lg font-bold text-white leading-[1.5]"
             >
-              প্রোফাইল ও অ্যাকাউন্ট
+              প্রোফাইল ও ক্লাউড অ্যাকাউন্ট
             </h2>
-            <p className="text-xs font-medium text-slate-300 leading-[1.5]">
-              {isGuest ? 'অতিথি ডেমো মোড' : `ইউজারনেম: @${displayUsername}`}
+            <p className="text-xs font-medium text-slate-300 leading-[1.5] break-all">
+              {isGuest
+                ? 'অতিথি ডেমো মোড (স্থানীয় ব্রাউজার)'
+                : accountEmail || 'ক্লাউড অ্যাকাউন্ট সক্রিয়'}
             </p>
           </div>
           <button
@@ -180,30 +180,27 @@ export function ProfileModal({
           </div>
         </form>
 
-        {/* Portable Account Actions */}
-        <div className="mt-5 pt-4 border-t border-white/10 space-y-2.5">
+        {/* Cloud Sign-Out / Login Action */}
+        <div className="mt-5 pt-4 border-t border-white/10">
           <button
             type="button"
             onClick={() => {
               onClose();
-              onOpenTransferModal();
+              onLogout();
             }}
-            className="w-full min-h-[44px] px-4 py-2 inline-flex items-center justify-center gap-2 text-xs sm:text-sm font-bold text-cyan-200 bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-400/35 rounded-xl transition-colors cursor-pointer"
+            className="w-full min-h-[44px] px-4 py-2 inline-flex items-center justify-center gap-2 text-xs sm:text-sm font-bold text-slate-100 bg-white/5 hover:bg-white/10 border border-white/15 rounded-xl transition-colors cursor-pointer"
           >
-            <Smartphone className="w-4 h-4 shrink-0" aria-hidden="true" />
-            <span>📲 অ্যাকাউন্ট ট্রান্সফার / সিঙ্ক কোড</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              onClose();
-              onSwitchAccount();
-            }}
-            className="w-full min-h-[42px] px-4 py-2 inline-flex items-center justify-center gap-2 text-xs sm:text-sm font-semibold text-slate-200 bg-white/5 hover:bg-white/10 border border-white/15 rounded-xl transition-colors cursor-pointer"
-          >
-            <LogOut className="w-4 h-4 shrink-0 text-amber-300" aria-hidden="true" />
-            <span>অ্যাকাউন্ট পরিবর্তন / লগআউট</span>
+            {isGuest ? (
+              <>
+                <LogIn className="w-4 h-4 shrink-0 text-emerald-300" aria-hidden="true" />
+                <span>ক্লাউড অ্যাকাউন্টে লগইন করুন</span>
+              </>
+            ) : (
+              <>
+                <LogOut className="w-4 h-4 shrink-0 text-amber-300" aria-hidden="true" />
+                <span>লগআউট করুন</span>
+              </>
+            )}
           </button>
         </div>
       </div>

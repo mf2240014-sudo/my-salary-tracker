@@ -238,6 +238,116 @@ export function clearBudgetState(): void {
   }
 }
 
+const GUEST_STORAGE_KEY = 'bn_orbital_guest_demo_v1';
+
+export function createGuestDemoState(): BudgetAppState {
+  const today = getTodayISODate();
+  return {
+    onboardingCompleted: true,
+    setup: {
+      basicSalary: 14000,
+      offDaysCount: 4,
+      offDayRate: 700,
+      overtimeIncome: 2800,
+      homeContribution: 9500,
+      officeFoodBudget: 3000,
+      savingsPercent: 60,
+    },
+    profile: {
+      name: 'অতিথি ব্যবহারকারী',
+      avatarUrl: '',
+    },
+    vaultConfig: {
+      home: {...DEFAULT_VAULT_CONFIG.home},
+      officeFood: {...DEFAULT_VAULT_CONFIG.officeFood},
+      savings: {...DEFAULT_VAULT_CONFIG.savings},
+      personal: {...DEFAULT_VAULT_CONFIG.personal},
+    },
+    security: {
+      pinEnabled: false,
+      pinCode: '',
+      soundEnabled: true,
+      privacyMasked: false,
+    },
+    savingsGoal: 20000,
+    buckets: {
+      home: {allocated: 9500, spent: 0},
+      officeFood: {allocated: 3000, spent: 280},
+      savings: {allocated: 2580, spent: 0},
+      personal: {allocated: 1720, spent: 150},
+    },
+    transactions: [
+      {
+        id: 'demo-salary-1',
+        type: 'salary',
+        date: today,
+        createdAt: new Date().toISOString(),
+        bucketId: 'home',
+        note: 'ডেমো মাসিক আয় (বেসিক ১৪,০০০ + অফ-ডে ২,৮০০)',
+        amount: 16800,
+        salaryBreakdown: {
+          home: 9500,
+          officeFood: 3000,
+          savings: 2580,
+          personal: 1720,
+        },
+      },
+      {
+        id: 'demo-food-1',
+        type: 'expense',
+        date: today,
+        createdAt: new Date().toISOString(),
+        bucketId: 'officeFood',
+        note: 'দুপুরের খাবার ও চা',
+        amount: 280,
+      },
+      {
+        id: 'demo-personal-1',
+        type: 'expense',
+        date: today,
+        createdAt: new Date().toISOString(),
+        bucketId: 'personal',
+        note: 'যাতায়াত ভাড়া',
+        amount: 150,
+      },
+    ],
+    loans: [
+      {
+        id: 'demo-loan-1',
+        type: 'receivable',
+        personName: 'রাফি (বন্ধু)',
+        amount: 1000,
+        date: today,
+        note: 'গত সপ্তাহের ধার',
+        settled: false,
+      },
+    ],
+  };
+}
+
+export function loadGuestBudgetState(): BudgetAppState {
+  try {
+    const raw = localStorage.getItem(GUEST_STORAGE_KEY);
+    if (!raw) {
+      return createGuestDemoState();
+    }
+    return {
+      ...normalizeBudgetState(JSON.parse(raw) as Partial<BudgetAppState>),
+      onboardingCompleted: true,
+    };
+  } catch {
+    return createGuestDemoState();
+  }
+}
+
+export function saveGuestBudgetState(state: BudgetAppState): void {
+  try {
+    localStorage.setItem(GUEST_STORAGE_KEY, JSON.stringify(state));
+  } catch {
+    // Ignore storage quota errors
+  }
+}
+
 export function exportBackupJSON(state: BudgetAppState): void {
   const payload = {
     version: 4,

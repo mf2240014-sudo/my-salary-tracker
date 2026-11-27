@@ -1,12 +1,14 @@
+import {onAuthStateChanged, User as FirebaseUser} from 'firebase/auth';
 import {
   Bell,
   CheckCircle2,
+  Cloud,
   Download,
   Eye,
   EyeOff,
   FileJson,
+  Loader2,
   Menu,
-  Smartphone,
   Sparkles,
   Upload,
   User,
@@ -17,8 +19,8 @@ import {
   X,
 } from 'lucide-react';
 import {useEffect, useMemo, useRef, useState} from 'react';
-import {AccountTransferModal} from './components/AccountTransferModal';
 import {AISmartReportModal} from './components/AISmartReportModal';
+import {CloudAuthScreen} from './components/CloudAuthScreen';
 import {FullTransactionsView} from './components/FullTransactionsView';
 import {IncomeSetupModal} from './components/IncomeSetupModal';
 import {LiquidSavingsTank} from './components/LiquidSavingsTank';
@@ -26,7 +28,6 @@ import {LoansSummaryWidget, LoansView} from './components/LoansView';
 import {OrbitalSalaryFlow} from './components/OrbitalSalaryFlow';
 import {PinLockScreen} from './components/PinLockScreen';
 import {ProfileModal} from './components/ProfileModal';
-import {PublicAuthPortal} from './components/PublicAuthPortal';
 import {PublicFooter} from './components/PublicFooter';
 import {QuickExpensePanel} from './components/QuickExpensePanel';
 import {RecentTransactionsPanel} from './components/RecentTransactionsPanel';
@@ -38,9 +39,15 @@ import {
   OnboardingPayload,
   WelcomeOnboardingModal,
 } from './components/WelcomeOnboardingModal';
+import {
+  auth,
+  fetchUserBudgetState,
+  logoutFirebaseUser,
+  saveUserBudgetState,
+  subscribeUserBudgetState,
+} from './firebase';
 import {useOnlineStatus, usePWAInstall} from './hooks/usePWAInstall';
 import {
-  AccountsRegistry,
   BUCKET_LIST,
   BucketId,
   BudgetAppState,
@@ -53,15 +60,6 @@ import {
   TransactionRecord,
   UserProfile,
 } from './types/budget';
-import {
-  enterGuestMode,
-  loadAccountsRegistry,
-  loginLocalAccount,
-  registerLocalAccount,
-  saveAccountsRegistry,
-  upsertRestoredAccount,
-} from './utils/accounts';
-import {decryptAccountSyncCode} from './utils/cryptoSync';
 import {playCoinChime, playSoftClick} from './utils/feedback';
 import {
   exportBackupJSON,
@@ -69,7 +67,10 @@ import {
   formatBDT,
   formatNumber,
   getTodayISODate,
+  loadGuestBudgetState,
+  normalizeBudgetState,
   parseBackupJSON,
+  saveGuestBudgetState,
 } from './utils/format';
 
 function generateId(): string {
@@ -79,48 +80,44 @@ function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
+function getCloudCacheKey(uid: string): string {
+  return `bn_orbital_cloud_cache_${uid}`;
+}
+
+function loadCloudCache(uid: string): BudgetAppState | null {
+  try {
+    const raw = localStorage.getItem(getCloudCacheKey(uid));
+    if (!raw) return null;
+    return normalizeBudgetState(JSON.parse(raw) as Partial<BudgetAppState>);
+  } catch {
+    return null;
+  }
+}
+
+function saveCloudCache(uid: string, state: BudgetAppState): void {
+  try {
+    localStorage.setItem(getCloudCacheKey(uid), JSON.stringify(state));
+  } catch {
+    // Ignore storage quota errors
+  }
+}
+
 export default function App() {
-  const [registry, setRegistry] = useState<AccountsRegistry>(() => loadAccountsRegistry());
-  const activeAccount = useMemo(
-    () => registry.accounts.find((a) => a.id === registry.activeAccountId) ?? null,
-    [registry]
-  );
-  const state = activeAccount?.state ?? EMPTY_APP_STATE;
+  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [cloudLoading, setCloudLoading] = useState(false);
+  const [isGuestMode, setIsGuestMode] = useState(false);
+  const [state, setState] = useState<BudgetAppState>(EMPTY_APP_STATE);
 
-  const setState = (
-    updater: BudgetAppState | ((prev: BudgetAppState) => BudgetAppState)
-  ) => {
-    setRegistry((prevReg) => {
-      if (!prevReg.activeAccountId) return prevReg;
-      const now = new Date().toISOString();
-      const nextAccounts = prevReg.accounts.map((acc) => {
-        if (acc.id !== prevReg.activeAccountId) return acc;
-        const nextState =
-          typeof updater === 'function' ? updater(acc.state) : updater;
-        return {
-          ...acc,
-          updatedAt: now,
-          state: nextState,
-        };
-      });
-      const nextReg: AccountsRegistry = {
-        ...prevReg,
-        accounts: nextAccounts,
-      };
-      saveAccountsRegistry(nextReg);
-      return nextReg;
-    });
-  };
+  const cloudReadyRef = useRef(false);
+  const lastSyncedJsonRef = useRef('');
 
-  const [isUnlocked, setIsUnlocked] = useState<boolean>(
-    () => !(state.security.pinEnabled && state.security.pinCode.length === 4)
-  );
+  const [isUnlocked, setIsUnlocked] = useState<boolean>(true);
   const [activeView, setActiveView] = useState<NavSection>('dashboard');
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isIncomeModalOpen, setIsIncomeModalOpen] = useState(false);
   const [isAIReportOpen, setIsAIReportOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
-  const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isBackupMenuOpen, setIsBackupMenuOpen] = useState(false);
@@ -138,6 +135,123 @@ export default function App() {
   const notifContainerRef = useRef<HTMLDivElement | null>(null);
   const backupContainerRef = useRef<HTMLDivElement | null>(null);
   const headerJsonInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    let unsubscribeSnapshot: (() => void) | null = null;
+    let isCancelled = false;
+
+    const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
+      if (unsubscribeSnapshot) {
+        unsubscribeSnapshot();
+        unsubscribeSnapshot = null;
+      }
+
+      cloudReadyRef.current = false;
+      lastSyncedJsonRef.current = '';
+      setFirebaseUser(user);
+
+      if (!user) {
+        setCloudLoading(false);
+        setAuthLoading(false);
+        return;
+      }
+
+      setIsGuestMode(false);
+      setAuthLoading(false);
+      setCloudLoading(true);
+      setActiveView('dashboard');
+
+      const defaultNewUserState: BudgetAppState = {
+        ...EMPTY_APP_STATE,
+        onboardingCompleted: false,
+        profile: {
+          name:
+            user.displayName?.trim() ||
+            user.email?.split('@')[0] ||
+            'ব্যবহারকারী',
+          avatarUrl: user.photoURL || '',
+        },
+      };
+
+      try {
+        const remoteState = await fetchUserBudgetState(user.uid);
+        if (isCancelled) return;
+
+        const resolvedState = remoteState ?? defaultNewUserState;
+        lastSyncedJsonRef.current = JSON.stringify(resolvedState);
+        if (remoteState) {
+          saveCloudCache(user.uid, resolvedState);
+        }
+        cloudReadyRef.current = true;
+        setState(resolvedState);
+        setIsUnlocked(
+          !(
+            resolvedState.security.pinEnabled &&
+            resolvedState.security.pinCode.length === 4
+          )
+        );
+      } catch {
+        if (isCancelled) return;
+        const cached = loadCloudCache(user.uid);
+        const fallbackState = cached ?? defaultNewUserState;
+        lastSyncedJsonRef.current = JSON.stringify(fallbackState);
+        cloudReadyRef.current = true;
+        setState(fallbackState);
+        setIsUnlocked(
+          !(
+            fallbackState.security.pinEnabled &&
+            fallbackState.security.pinCode.length === 4
+          )
+        );
+      } finally {
+        if (!isCancelled) {
+          setCloudLoading(false);
+        }
+      }
+
+      if (isCancelled) return;
+
+      unsubscribeSnapshot = subscribeUserBudgetState(
+        user.uid,
+        (remoteState, isLocalPending) => {
+          if (isCancelled || isLocalPending || !remoteState) return;
+          const remoteJson = JSON.stringify(remoteState);
+          if (remoteJson === lastSyncedJsonRef.current) return;
+          lastSyncedJsonRef.current = remoteJson;
+          saveCloudCache(user.uid, remoteState);
+          setState(remoteState);
+        }
+      );
+    });
+
+    return () => {
+      isCancelled = true;
+      unsubscribeAuth();
+      if (unsubscribeSnapshot) {
+        unsubscribeSnapshot();
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (isGuestMode && !firebaseUser) {
+      saveGuestBudgetState(state);
+      return;
+    }
+
+    if (firebaseUser && cloudReadyRef.current) {
+      const nextJson = JSON.stringify(state);
+      if (nextJson === lastSyncedJsonRef.current) return;
+      lastSyncedJsonRef.current = nextJson;
+      saveCloudCache(firebaseUser.uid, state);
+      void saveUserBudgetState(firebaseUser.uid, state, {
+        email: firebaseUser.email,
+        displayName: state.profile.name || firebaseUser.displayName,
+      }).catch(() => {
+        // Transient offline/network error; cached locally for next sync
+      });
+    }
+  }, [state, firebaseUser, isGuestMode]);
 
   useEffect(() => {
     setAvatarImgError(false);
@@ -792,71 +906,42 @@ export default function App() {
     showToast('সব ভল্টের ব্যালেন্স ও তালিকা রিসেট করা হয়েছে।');
   };
 
-  const handleRegisterAccount = async (payload: {
-    username: string;
-    displayName: string;
-    password: string;
-  }) => {
-    const res = await registerLocalAccount(registry, payload);
-    setRegistry(res.registry);
-    setIsUnlocked(true);
-    setActiveView('dashboard');
-    playCoinChime(true);
-    showToast(`স্বাগতম ${payload.displayName}! এখন আপনার ৪টি ভল্ট সেটআপ করুন।`);
-  };
-
-  const handleLoginAccount = async (payload: {
-    username: string;
-    password: string;
-  }) => {
-    const res = await loginLocalAccount(registry, payload);
-    setRegistry(res.registry);
-    setIsUnlocked(true);
-    setActiveView('dashboard');
-    playCoinChime(res.account.state.security.soundEnabled);
-    showToast(`স্বাগতম ${res.account.state.profile.name}!`);
-  };
-
-  const handleRestoreFromSyncCode = async (payload: {
-    syncCode: string;
-    username: string;
-    password: string;
-  }) => {
-    const decrypted = await decryptAccountSyncCode(payload);
-    const res = await upsertRestoredAccount(registry, {
-      username: decrypted.username,
-      displayUsername: decrypted.displayUsername,
-      password: payload.password,
-      state: decrypted.state,
-    });
-    setRegistry(res.registry);
-    setIsUnlocked(true);
-    setActiveView('dashboard');
-    playCoinChime(res.account.state.security.soundEnabled);
-    showToast('অন্য ডিভাইস থেকে আপনার সম্পূর্ণ অ্যাকাউন্ট সফলভাবে আনলক হয়েছে!');
-  };
-
   const handleEnterGuestMode = () => {
-    const res = enterGuestMode(registry);
-    setRegistry(res.registry);
+    const guestState = loadGuestBudgetState();
+    setIsGuestMode(true);
+    setState(guestState);
     setIsUnlocked(true);
     setActiveView('dashboard');
-    playSoftClick(true);
-    showToast('অতিথি ডেমো মোডে স্বাগতম! নিজের অ্যাকাউন্ট খুলতে উপরের বাটনে ক্লিক করুন।');
+    playSoftClick(guestState.security.soundEnabled);
+    showToast(
+      'অতিথি ডেমো মোডে স্বাগতম! ক্লাউডে সেভ করতে চাইলে যেকোনো সময় লগইন করতে পারবেন।'
+    );
   };
 
-  const handleSwitchAccount = () => {
+  const handleLogout = async () => {
     setIsProfileModalOpen(false);
-    setIsTransferModalOpen(false);
     setIsMobileSidebarOpen(false);
-    setRegistry((prevReg) => {
-      const nextReg: AccountsRegistry = {
-        ...prevReg,
-        activeAccountId: null,
-      };
-      saveAccountsRegistry(nextReg);
-      return nextReg;
-    });
+    setIsBackupMenuOpen(false);
+    setIsNotificationsOpen(false);
+
+    if (firebaseUser) {
+      cloudReadyRef.current = false;
+      lastSyncedJsonRef.current = '';
+      try {
+        await logoutFirebaseUser();
+        setState(EMPTY_APP_STATE);
+        setIsUnlocked(true);
+        playSoftClick(state.security.soundEnabled);
+        showToast('সফলভাবে লগআউট করা হয়েছে।');
+      } catch {
+        showToast('লগআউট করতে সমস্যা হয়েছে। আবার চেষ্টা করুন।');
+      }
+      return;
+    }
+
+    setIsGuestMode(false);
+    setState(EMPTY_APP_STATE);
+    setIsUnlocked(true);
     playSoftClick(state.security.soundEnabled);
   };
 
@@ -897,16 +982,31 @@ export default function App() {
     reader.readAsText(file, 'utf-8');
   };
 
-  if (!activeAccount) {
+  if (authLoading || (firebaseUser && cloudLoading)) {
+    return (
+      <div className="min-h-screen bg-[#070b14] text-slate-100 flex flex-col items-center justify-center p-6">
+        <div className="rounded-3xl bg-[#0b1324]/90 border border-emerald-400/25 px-8 py-7 flex flex-col items-center gap-4 shadow-[0_0_40px_rgba(16,185,129,0.16)] max-w-sm w-full text-center">
+          <div className="w-12 h-12 rounded-full bg-emerald-500/15 border border-emerald-400/40 flex items-center justify-center">
+            <Loader2 className="w-6 h-6 text-emerald-300 animate-spin" aria-hidden="true" />
+          </div>
+          <div className="space-y-1">
+            <p className="text-base font-bold text-white leading-[1.4]">
+              অরবিটাল ওয়েলথ ভল্ট
+            </p>
+            <p className="text-xs sm:text-sm font-medium text-slate-300 leading-[1.5] flex items-center justify-center gap-1.5">
+              <Cloud className="w-4 h-4 text-cyan-300 shrink-0" aria-hidden="true" />
+              <span>ক্লাউড ডাটা লোড হচ্ছে...</span>
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!firebaseUser && !isGuestMode) {
     return (
       <>
-        <PublicAuthPortal
-          savedAccounts={registry.accounts}
-          onRegister={handleRegisterAccount}
-          onLogin={handleLoginAccount}
-          onRestoreFromSyncCode={handleRestoreFromSyncCode}
-          onEnterGuestMode={handleEnterGuestMode}
-        />
+        <CloudAuthScreen onEnterGuestMode={handleEnterGuestMode} />
         {toastMessage && (
           <div
             role="status"
@@ -939,9 +1039,10 @@ export default function App() {
       <>
         <WelcomeOnboardingModal
           initialName={state.profile.name}
+          initialAvatarUrl={state.profile.avatarUrl}
           onComplete={handleCompleteOnboarding}
           onImportJSON={handleImportJSON}
-          onBackToAuth={handleSwitchAccount}
+          onBackToAuth={handleLogout}
         />
         {toastMessage && (
           <div
@@ -989,15 +1090,9 @@ export default function App() {
           playSoftClick(state.security.soundEnabled);
           setIsAIReportOpen(true);
         }}
-        onOpenTransferModal={() => {
-          playSoftClick(state.security.soundEnabled);
-          setIsTransferModalOpen(true);
-        }}
-        onSwitchAccount={handleSwitchAccount}
+        onLogout={handleLogout}
+        isGuest={!firebaseUser}
         accountDisplayName={state.profile.name}
-        accountHandle={
-          activeAccount.isGuest ? 'অতিথি' : `@${activeAccount.displayUsername}`
-        }
         canInstallPWA={canInstallPWA}
         onInstallPWA={handleInstallPWA}
       />
@@ -1043,21 +1138,6 @@ export default function App() {
                 <Sparkles className="w-4 h-4 text-cyan-300 shrink-0" aria-hidden="true" />
                 <span className="hidden md:inline">✨ এআই স্মার্ট রিপোর্ট</span>
                 <span className="md:hidden hidden sm:inline">রিপোর্ট</span>
-              </button>
-
-              {/* Portable Account Sync Code Button */}
-              <button
-                type="button"
-                onClick={() => {
-                  playSoftClick(state.security.soundEnabled);
-                  setIsTransferModalOpen(true);
-                }}
-                title="📲 অ্যাকাউন্ট ট্রান্সফার / সিঙ্ক কোড"
-                aria-label="অ্যাকাউন্ট ট্রান্সফার / সিঙ্ক কোড"
-                className="inline-flex items-center justify-center gap-1.5 min-h-[40px] px-2.5 sm:px-3 py-2 text-xs font-bold text-emerald-200 bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-400/35 rounded-xl transition-all whitespace-nowrap shrink-0 cursor-pointer"
-              >
-                <Smartphone className="w-4 h-4 text-emerald-300 shrink-0" aria-hidden="true" />
-                <span className="hidden md:inline">📲 সিঙ্ক কোড</span>
               </button>
 
               {/* PWA Install Button (when installable) */}
@@ -1260,18 +1340,18 @@ export default function App() {
             </div>
           )}
 
-          {activeAccount.isGuest && (
+          {!firebaseUser && isGuestMode && (
             <div className="bg-cyan-500/12 border-t border-cyan-400/25 px-4 py-2 flex flex-wrap items-center justify-center gap-3 text-xs font-semibold text-cyan-100">
               <span>
-                অতিথি / ডেমো মোডে আছেন — নিজের স্বাধীন স্যালারি ও ভল্ট সংরক্ষণ করতে নিজস্ব অ্যাকাউন্ট খুলুন
+                অতিথি / ডেমো মোডে আছেন — যেকোনো ডিভাইস থেকে ক্লাউড সিঙ্ক পেতে লগইন করুন
               </span>
               <button
                 type="button"
-                onClick={handleSwitchAccount}
+                onClick={handleLogout}
                 className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-gradient-to-r from-emerald-400 to-cyan-400 text-[#041210] font-bold hover:from-emerald-300 hover:to-cyan-300 transition-colors cursor-pointer"
               >
                 <UserPlus className="w-3.5 h-3.5" aria-hidden="true" />
-                <span>নিজস্ব অ্যাকাউন্ট তৈরি করুন</span>
+                <span>ক্লাউড অ্যাকাউন্টে লগইন করুন</span>
               </button>
             </div>
           )}
@@ -1376,7 +1456,6 @@ export default function App() {
               onTransfer={handleTransfer}
               onExportJSON={handleExportJSON}
               onImportJSON={handleImportJSON}
-              onOpenTransferModal={() => setIsTransferModalOpen(true)}
               onRequestReset={() => setIsResetModalOpen(true)}
             />
           )}
@@ -1417,26 +1496,16 @@ export default function App() {
         privacyMasked={privacyMasked}
       />
 
-      {/* Account Transfer / Sync Code Modal */}
-      <AccountTransferModal
-        key={`${activeAccount.id}-${isTransferModalOpen}`}
-        isOpen={isTransferModalOpen}
-        account={activeAccount}
-        onClose={() => setIsTransferModalOpen(false)}
-        onToast={showToast}
-      />
-
       {/* Profile Modal */}
       <ProfileModal
-        key={`${activeAccount.id}-${state.profile.name}-${isProfileModalOpen}`}
+        key={`${firebaseUser?.uid ?? 'guest'}-${state.profile.name}-${isProfileModalOpen}`}
         isOpen={isProfileModalOpen}
         profile={state.profile}
-        displayUsername={activeAccount.displayUsername}
-        isGuest={activeAccount.isGuest}
+        accountEmail={firebaseUser?.email ?? null}
+        isGuest={!firebaseUser}
         onClose={() => setIsProfileModalOpen(false)}
         onSaveProfile={handleSaveProfile}
-        onOpenTransferModal={() => setIsTransferModalOpen(true)}
-        onSwitchAccount={handleSwitchAccount}
+        onLogout={handleLogout}
       />
 
       {/* Reset Confirmation Modal */}
