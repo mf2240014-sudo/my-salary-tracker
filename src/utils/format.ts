@@ -436,3 +436,49 @@ export function exportTransactionsToCSV(
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
 }
+
+export async function compressProfileImage(
+  file: File,
+  maxDimension = 200,
+  quality = 0.7
+): Promise<string> {
+  if (!file.type.startsWith('image/')) {
+    throw new Error('দয়া করে একটি সঠিক ছবি (JPG, PNG বা WebP) নির্বাচন করুন।');
+  }
+
+  const loadImage = (src: string): Promise<HTMLImageElement> =>
+    new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error('ছবিটি প্রসেস করা যায়নি।'));
+      img.src = src;
+    });
+
+  const objectUrl = URL.createObjectURL(file);
+  try {
+    const img = await loadImage(objectUrl);
+    const srcWidth = img.naturalWidth || img.width || maxDimension;
+    const srcHeight = img.naturalHeight || img.height || maxDimension;
+    const scale = Math.min(1, maxDimension / srcWidth, maxDimension / srcHeight);
+    const targetWidth = Math.max(1, Math.round(srcWidth * scale));
+    const targetHeight = Math.max(1, Math.round(srcHeight * scale));
+
+    const canvas = document.createElement('canvas');
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      throw new Error('ব্রাউজারে ছবি কম্প্রেশন সমর্থিত নয়।');
+    }
+
+    // Fill white background so transparent PNGs don't render black in JPEG
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, targetWidth, targetHeight);
+    ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+
+    return canvas.toDataURL('image/jpeg', quality);
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}

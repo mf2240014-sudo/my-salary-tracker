@@ -1498,7 +1498,7 @@ export default function App() {
 
       {/* Profile Modal */}
       <ProfileModal
-        key={`${firebaseUser?.uid ?? 'guest'}-${state.profile.name}-${isProfileModalOpen}`}
+        key={`${firebaseUser?.uid ?? 'guest'}-${state.profile.name}-${state.profile.avatarUrl.length}-${state.profile.avatarUrl.slice(-16)}-${isProfileModalOpen}`}
         isOpen={isProfileModalOpen}
         profile={state.profile}
         accountEmail={firebaseUser?.email ?? null}

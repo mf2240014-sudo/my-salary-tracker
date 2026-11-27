@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import {useRef, useState} from 'react';
 import {UserProfile} from '../types/budget';
+import {compressProfileImage} from '../utils/format';
 
 interface ProfileModalProps {
   isOpen: boolean;
@@ -31,27 +32,35 @@ export function ProfileModal({
   const [name, setName] = useState(profile.name);
   const [avatarUrl, setAvatarUrl] = useState(profile.avatarUrl);
   const [imgError, setImgError] = useState(false);
+  const [isCompressing, setIsCompressing] = useState(false);
+  const [uploadError, setUploadError] = useState('');
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   if (!isOpen) return null;
 
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        setAvatarUrl(reader.result);
-        setImgError(false);
-      }
-    };
-    reader.readAsDataURL(file);
-    e.target.value = '';
+    setUploadError('');
+    setIsCompressing(true);
+    try {
+      const compressedDataUrl = await compressProfileImage(file, 200, 0.7);
+      setAvatarUrl(compressedDataUrl);
+      setImgError(false);
+    } catch (err) {
+      setUploadError(
+        err instanceof Error ? err.message : 'ছবিটি আপলোড করা যায়নি।'
+      );
+    } finally {
+      setIsCompressing(false);
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isCompressing) return;
     onSaveProfile({
       name: name.trim() || 'আমার অ্যাকাউন্ট',
       avatarUrl,
@@ -62,6 +71,7 @@ export function ProfileModal({
   const handleResetAvatar = () => {
     setAvatarUrl('');
     setImgError(false);
+    setUploadError('');
   };
 
   return (
@@ -116,24 +126,32 @@ export function ProfileModal({
             <div className="flex items-center gap-2">
               <button
                 type="button"
+                disabled={isCompressing}
                 onClick={() => fileInputRef.current?.click()}
-                className="min-h-[38px] px-3.5 py-1.5 inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-200 bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-400/40 rounded-xl transition-colors cursor-pointer"
+                className="min-h-[38px] px-3.5 py-1.5 inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-200 bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-400/40 rounded-xl transition-colors disabled:opacity-60 cursor-pointer"
               >
                 <Camera className="w-3.5 h-3.5" aria-hidden="true" />
-                <span>নতুন ছবি আপলোড</span>
+                <span>{isCompressing ? 'প্রসেস হচ্ছে...' : 'নতুন ছবি আপলোড'}</span>
               </button>
 
               {avatarUrl !== '' && (
                 <button
                   type="button"
+                  disabled={isCompressing}
                   onClick={handleResetAvatar}
-                  className="min-h-[38px] px-3 py-1.5 inline-flex items-center gap-1.5 text-xs font-semibold text-slate-300 bg-white/5 hover:bg-white/10 border border-white/15 rounded-xl transition-colors cursor-pointer"
+                  className="min-h-[38px] px-3 py-1.5 inline-flex items-center gap-1.5 text-xs font-semibold text-slate-300 bg-white/5 hover:bg-white/10 border border-white/15 rounded-xl transition-colors disabled:opacity-60 cursor-pointer"
                 >
                   <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" />
                   <span>ছবি সরান</span>
                 </button>
               )}
             </div>
+
+            {uploadError && (
+              <p className="text-xs font-semibold text-rose-300 text-center">
+                {uploadError}
+              </p>
+            )}
 
             <input
               ref={fileInputRef}

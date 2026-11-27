@@ -153,6 +153,23 @@ export async function logoutFirebaseUser(): Promise<void> {
   await signOut(auth);
 }
 
+function hydrateStateFromFirestoreDoc(data: DocumentData): BudgetAppState {
+  const rawState = (data.budgetState ?? data) as Partial<BudgetAppState>;
+  const normalized = normalizeBudgetState(rawState);
+  const syncedProfileImage =
+    typeof data.profileImage === 'string'
+      ? data.profileImage
+      : normalized.profile.avatarUrl;
+
+  return {
+    ...normalized,
+    profile: {
+      ...normalized.profile,
+      avatarUrl: syncedProfileImage,
+    },
+  };
+}
+
 export async function fetchUserBudgetState(
   uid: string
 ): Promise<BudgetAppState | null> {
@@ -161,9 +178,7 @@ export async function fetchUserBudgetState(
   if (!snap.exists()) {
     return null;
   }
-  const data = snap.data() as DocumentData;
-  const rawState = (data.budgetState ?? data) as Partial<BudgetAppState>;
-  return normalizeBudgetState(rawState);
+  return hydrateStateFromFirestoreDoc(snap.data() as DocumentData);
 }
 
 export async function saveUserBudgetState(
@@ -179,6 +194,7 @@ export async function saveUserBudgetState(
       uid,
       email: meta?.email ?? null,
       displayName: meta?.displayName ?? state.profile.name,
+      profileImage: state.profile.avatarUrl ?? '',
       updatedAt: new Date().toISOString(),
       budgetState: cleanState,
     }),
@@ -199,9 +215,10 @@ export function subscribeUserBudgetState(
         onData(null, snap.metadata.hasPendingWrites);
         return;
       }
-      const data = snap.data() as DocumentData;
-      const rawState = (data.budgetState ?? data) as Partial<BudgetAppState>;
-      onData(normalizeBudgetState(rawState), snap.metadata.hasPendingWrites);
+      onData(
+        hydrateStateFromFirestoreDoc(snap.data() as DocumentData),
+        snap.metadata.hasPendingWrites
+      );
     },
     (err) => {
       onError?.(err);

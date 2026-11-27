@@ -8,7 +8,11 @@ import {
   UserProfile,
   VaultConfigMap,
 } from '../types/budget';
-import {formatBDT, formatNumber} from '../utils/format';
+import {
+  compressProfileImage,
+  formatBDT,
+  formatNumber,
+} from '../utils/format';
 
 export interface OnboardingPayload {
   profile: UserProfile;
@@ -154,17 +158,19 @@ export function WelcomeOnboardingModal({
     setError('');
   };
 
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        setAvatarUrl(reader.result);
-      }
-    };
-    reader.readAsDataURL(file);
     e.target.value = '';
+    if (!file) return;
+    try {
+      const compressedDataUrl = await compressProfileImage(file, 200, 0.7);
+      setAvatarUrl(compressedDataUrl);
+      setError('');
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : 'প্রোফাইল ছবিটি আপলোড করা যায়নি।'
+      );
+    }
   };
 
   const handleBackupImport = (e: React.ChangeEvent<HTMLInputElement>) => {
