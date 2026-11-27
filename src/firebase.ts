@@ -23,7 +23,7 @@ import {BudgetAppState} from './types/budget';
 import {normalizeBudgetState} from './utils/format';
 
 export const firebaseConfig = {
-  apiKey: 'AIzaSyDmwuGGN_bGVzPisnx_T9SzehAydzCrzCc',
+  apiKey: 'AIzaSyDmwuGGN_bGVzPisnx_T9SzehAydzCrrCc',
   authDomain: 'orbital-vault.firebaseapp.com',
   projectId: 'orbital-vault',
   storageBucket: 'orbital-vault.firebasestorage.app',
